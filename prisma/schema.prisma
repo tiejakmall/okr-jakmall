@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  MEMBER
+}
+
+model User {
+  id         String      @id @default(cuid())
+  name       String
+  email      String      @unique
+  password   String
+  role       Role        @default(MEMBER)
+  division   String?
+  objectives Objective[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+model Quarter {
+  id         String      @id @default(cuid())
+  name       String
+  year       Int
+  quarter    Int
+  startDate  DateTime
+  endDate    DateTime
+  isActive   Boolean     @default(false)
+  objectives Objective[]
+  createdAt  DateTime    @default(now())
+
+  @@unique([year, quarter])
+}
+
+model Objective {
+  id         String      @id @default(cuid())
+  title      String
+  weight     Float       @default(100)
+  userId     String
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quarterId  String
+  quarter    Quarter     @relation(fields: [quarterId], references: [id], onDelete: Cascade)
+  keyResults KeyResult[]
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+}
+
+model KeyResult {
+  id           String    @id @default(cuid())
+  title        String
+  target       Float
+  unit         String
+  weight       Float
+  teamProgress Float     @default(0)
+  leadProgress Float?
+  objectiveId  String
+  objective    Objective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
