@@ -8,20 +8,37 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params;
   const body = await req.json();
-  const kr = await prisma.keyResult.update({
+
+  // Lead bisa override leadProgress untuk anggota divisinya
+  // Member hanya bisa update teamProgress miliknya sendiri
+  const kr = await prisma.keyResult.findUnique({
     where: { id },
-    data: {
-      ...(body.title !== undefined && { title: body.title }),
-      ...(body.target !== undefined && { target: Number(body.target) }),
-      ...(body.unit !== undefined && { unit: body.unit }),
-      ...(body.weight !== undefined && { weight: Number(body.weight) }),
-      ...(body.teamProgress !== undefined && { teamProgress: Number(body.teamProgress) }),
-      ...("leadProgress" in body && {
-        leadProgress: body.leadProgress !== null ? Number(body.leadProgress) : null,
-      }),
-    },
+    include: { objective: { include: { user: true } } },
   });
-  return NextResponse.json(kr);
+  if (!kr) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const owner = kr.objective.user;
+  const isAdmin = session.user.role === "ADMIN";
+  const isLead = session.user.role === "LEAD" && owner.division === session.user.division;
+  const isOwner = owner.id === session.user.id;
+
+  if (!isAdmin && !isLead && !isOwner) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Member tidak bisa set leadProgress
+  const data: Record<string, unknown> = {};
+  if (body.title !== undefined && (isAdmin || isLead || isOwner)) data.title = body.title;
+  if (body.target !== undefined && (isAdmin || isLead || isOwner)) data.target = Number(body.target);
+  if (body.unit !== undefined && (isAdmin || isLead || isOwner)) data.unit = body.unit;
+  if (body.weight !== undefined && (isAdmin || isLead || isOwner)) data.weight = Number(body.weight);
+  if (body.teamProgress !== undefined) data.teamProgress = Number(body.teamProgress);
+  if ("leadProgress" in body && (isAdmin || isLead)) {
+    data.leadProgress = body.leadProgress !== null ? Number(body.leadProgress) : null;
+  }
+
+  const updated = await prisma.keyResult.update({ where: { id }, data });
+  return NextResponse.json(updated);
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {

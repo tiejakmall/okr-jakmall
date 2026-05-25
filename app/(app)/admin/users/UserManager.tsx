@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Trash2, Edit2, X, Check } from "lucide-react";
+import { Plus, Trash2, Edit2 } from "lucide-react";
 
 type User = {
   id: string;
@@ -22,6 +22,13 @@ type FormState = {
 
 const emptyForm: FormState = { name: "", email: "", password: "", role: "MEMBER", division: "" };
 
+const ROLE_LABELS: Record<string, string> = { ADMIN: "Admin", LEAD: "Lead Divisi", MEMBER: "Member" };
+const ROLE_COLORS: Record<string, string> = {
+  ADMIN: "bg-red-100 text-red-700",
+  LEAD: "bg-yellow-100 text-yellow-700",
+  MEMBER: "bg-gray-100 text-gray-600",
+};
+
 export default function UserManager({ initialUsers }: { initialUsers: User[] }) {
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [showForm, setShowForm] = useState(false);
@@ -35,42 +42,32 @@ export default function UserManager({ initialUsers }: { initialUsers: User[] }) 
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
-    if (!res.ok) {
-      const err = await res.json();
-      alert(err.error ?? "Gagal membuat pengguna");
-      return;
-    }
+    if (!res.ok) { alert((await res.json()).error ?? "Gagal"); return; }
     const user = await res.json();
-    setUsers((prev) => [...prev, user].sort((a, b) => a.name.localeCompare(b.name)));
+    setUsers(prev => [...prev, user].sort((a, b) => a.name.localeCompare(b.name)));
     setShowForm(false);
     setForm(emptyForm);
   }
 
   async function updateUser() {
     if (!editId) return;
-    const payload: Partial<FormState> = {
-      name: form.name,
-      email: form.email,
-      role: form.role,
-      division: form.division,
-    };
+    const payload: Partial<FormState> = { name: form.name, email: form.email, role: form.role, division: form.division };
     if (form.password) payload.password = form.password;
-
     const res = await fetch(`/api/users/${editId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
     const updated = await res.json();
-    setUsers((prev) => prev.map((u) => (u.id === editId ? updated : u)));
+    setUsers(prev => prev.map(u => u.id === editId ? updated : u));
     setEditId(null);
     setForm(emptyForm);
   }
 
   async function deleteUser(id: string) {
-    if (!confirm("Hapus pengguna ini? Semua OKR mereka akan terhapus.")) return;
+    if (!confirm("Hapus pengguna ini?")) return;
     await fetch(`/api/users/${id}`, { method: "DELETE" });
-    setUsers((prev) => prev.filter((u) => u.id !== id));
+    setUsers(prev => prev.filter(u => u.id !== id));
   }
 
   function startEdit(user: User) {
@@ -85,78 +82,66 @@ export default function UserManager({ initialUsers }: { initialUsers: User[] }) 
       <div className="grid grid-cols-2 gap-4">
         <div>
           <label className="block text-xs text-gray-500 mb-1">Nama</label>
-          <input
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
+          <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400"
+            value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Email</label>
-          <input
-            type="email"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400"
-            value={form.email}
-            onChange={(e) => setForm({ ...form, email: e.target.value })}
-          />
+          <input type="email" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400"
+            value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">
             Password {isEdit && <span className="text-gray-400">(kosongkan jika tidak diubah)</span>}
           </label>
-          <input
-            type="password"
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400"
-            value={form.password}
-            onChange={(e) => setForm({ ...form, password: e.target.value })}
-            placeholder={isEdit ? "••••••••" : ""}
-          />
-        </div>
-        <div>
-          <label className="block text-xs text-gray-500 mb-1">Divisi</label>
-          <input
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400"
-            value={form.division}
-            onChange={(e) => setForm({ ...form, division: e.target.value })}
-            placeholder="contoh: Designer Brand"
-          />
+          <input type="password" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400"
+            value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
         </div>
         <div>
           <label className="block text-xs text-gray-500 mb-1">Role</label>
-          <select
-            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400 bg-white"
-            value={form.role}
-            onChange={(e) => setForm({ ...form, role: e.target.value })}
-          >
-            <option value="MEMBER">Member</option>
-            <option value="ADMIN">Admin</option>
+          <select className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400 bg-white"
+            value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}>
+            <option value="MEMBER">Member (anggota divisi)</option>
+            <option value="LEAD">Lead Divisi</option>
+            <option value="ADMIN">Admin (HR)</option>
           </select>
+        </div>
+        <div className="col-span-2">
+          <label className="block text-xs text-gray-500 mb-1">
+            Divisi
+            {form.role === "LEAD" && <span className="text-yellow-600 ml-1">— Lead & Member dengan divisi sama akan tergroup</span>}
+          </label>
+          <input className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-yellow-400"
+            value={form.division} onChange={e => setForm({ ...form, division: e.target.value })}
+            placeholder="contoh: Designer Brand, Content Creator, Visual Designer" />
         </div>
       </div>
       <div className="flex gap-2 mt-4">
-        <button
-          onClick={isEdit ? updateUser : createUser}
-          className="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold text-sm px-4 py-2 rounded-lg transition"
-        >
+        <button onClick={isEdit ? updateUser : createUser}
+          className="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold text-sm px-4 py-2 rounded-lg transition">
           Simpan
         </button>
-        <button
-          onClick={() => { setShowForm(false); setEditId(null); setForm(emptyForm); }}
-          className="border border-gray-200 text-gray-600 text-sm px-4 py-2 rounded-lg hover:bg-gray-50 transition"
-        >
+        <button onClick={() => { setShowForm(false); setEditId(null); setForm(emptyForm); }}
+          className="border border-gray-200 text-gray-600 text-sm px-4 py-2 rounded-lg hover:bg-gray-50 transition">
           Batal
         </button>
       </div>
     </div>
   );
 
+  // Group by division for display
+  const grouped = users.reduce<Record<string, User[]>>((acc, u) => {
+    const key = u.division ?? "(Tanpa Divisi)";
+    if (!acc[key]) acc[key] = [];
+    acc[key].push(u);
+    return acc;
+  }, {});
+
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <button
-          onClick={() => { setShowForm(!showForm); setEditId(null); setForm(emptyForm); }}
-          className="flex items-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold text-sm px-4 py-2 rounded-lg transition"
-        >
+        <button onClick={() => { setShowForm(!showForm); setEditId(null); setForm(emptyForm); }}
+          className="flex items-center gap-2 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold text-sm px-4 py-2 rounded-lg transition">
           <Plus size={16} /> Tambah Pengguna
         </button>
       </div>
@@ -164,49 +149,41 @@ export default function UserManager({ initialUsers }: { initialUsers: User[] }) 
       {showForm && <FormPanel isEdit={false} />}
       {editId && <FormPanel isEdit={true} />}
 
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b">
-            <tr>
-              <th className="text-left px-4 py-3 font-semibold text-gray-600">Nama</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-600">Email</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-600">Divisi</th>
-              <th className="text-left px-4 py-3 font-semibold text-gray-600">Role</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((user) => (
-              <tr key={user.id} className="border-b last:border-0 hover:bg-gray-50">
-                <td className="px-4 py-3 font-medium text-gray-800">{user.name}</td>
-                <td className="px-4 py-3 text-gray-500">{user.email}</td>
-                <td className="px-4 py-3 text-gray-500">{user.division ?? "-"}</td>
-                <td className="px-4 py-3">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${user.role === "ADMIN" ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-600"}`}>
-                    {user.role}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    <button onClick={() => startEdit(user)} className="text-gray-400 hover:text-gray-700 transition">
-                      <Edit2 size={15} />
-                    </button>
-                    <button onClick={() => deleteUser(user.id)} className="text-red-400 hover:text-red-600 transition">
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {users.length === 0 && (
-              <tr>
-                <td colSpan={5} className="text-center py-8 text-gray-400">
-                  Belum ada pengguna.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      <div className="space-y-4">
+        {Object.entries(grouped).map(([division, divUsers]) => (
+          <div key={division} className="bg-white rounded-2xl shadow-sm overflow-hidden">
+            <div className="px-4 py-2 bg-gray-50 border-b flex items-center gap-2">
+              <span className="font-semibold text-gray-700 text-sm">{division}</span>
+              <span className="text-gray-400 text-xs">({divUsers.length} orang)</span>
+            </div>
+            <table className="w-full text-sm">
+              <tbody>
+                {divUsers.map(user => (
+                  <tr key={user.id} className="border-b last:border-0 hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-800">{user.name}</td>
+                    <td className="px-4 py-3 text-gray-500">{user.email}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${ROLE_COLORS[user.role] ?? "bg-gray-100 text-gray-600"}`}>
+                        {ROLE_LABELS[user.role] ?? user.role}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => startEdit(user)} className="text-gray-400 hover:text-gray-700 transition"><Edit2 size={15} /></button>
+                        <button onClick={() => deleteUser(user.id)} className="text-red-400 hover:text-red-600 transition"><Trash2 size={15} /></button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
+        {users.length === 0 && (
+          <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl p-10 text-center text-gray-400">
+            Belum ada pengguna.
+          </div>
+        )}
       </div>
     </div>
   );

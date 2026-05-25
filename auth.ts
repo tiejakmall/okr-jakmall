@@ -23,7 +23,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           user.password
         );
         if (!valid) return null;
-        return { id: user.id, name: user.name, email: user.email, role: user.role };
+        return { id: user.id, name: user.name, email: user.email, role: user.role, division: user.division };
       },
     }),
   ],
@@ -32,12 +32,14 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       if (user) {
         token.id = user.id;
         token.role = (user as { role?: string }).role;
+        token.division = (user as { division?: string | null }).division;
       }
       return token;
     },
     session({ session, token }) {
       session.user.id = token.id as string;
       session.user.role = token.role as string;
+      session.user.division = token.division as string | null;
       return session;
     },
   },
