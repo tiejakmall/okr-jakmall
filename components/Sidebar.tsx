@@ -12,7 +12,7 @@ const memberNav = [
 
 const leadNav = [
   { href: "/dashboard", label: "Dashboard Divisi", icon: LayoutDashboard },
-  { href: "/okr", label: "OKR Saya", icon: Target },
+  { href: "/okr", label: "OKR Divisi", icon: Target },
 ];
 
 const adminNav = [

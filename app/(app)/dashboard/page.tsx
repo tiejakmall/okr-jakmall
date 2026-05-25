@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { calcUserAchievement, calcObjectiveAchievement } from "@/lib/calculations";
+import { calcUserAchievement, calcObjectiveAchievement, calcMemberAchievement } from "@/lib/calculations";
 import LeadOverride from "./LeadOverride";
 
 function ProgressBar({ value, size = "md" }: { value: number; size?: "sm" | "md" }) {
@@ -8,7 +8,7 @@ function ProgressBar({ value, size = "md" }: { value: number; size?: "sm" | "md"
   const h = size === "sm" ? "h-1.5" : "h-2";
   return (
     <div className={`${h} bg-gray-100 rounded-full overflow-hidden`}>
-      <div className={`${h} ${color} rounded-full transition-all`} style={{ width: `${Math.min(value, 100)}%` }} />
+      <div className={`${h} ${color} rounded-full`} style={{ width: `${Math.min(value, 100)}%` }} />
     </div>
   );
 }
@@ -24,26 +24,24 @@ function StatusBadge({ status }: { status: string }) {
     : <span className="bg-gray-100 text-gray-500 text-xs font-semibold px-2 py-0.5 rounded-full">Draft</span>;
 }
 
-async function DivisionView({ users, quarterName, title }: {
-  users: Awaited<ReturnType<typeof prisma.user.findMany>>;
-  quarterName: string;
-  title: string;
-}) {
-  const usersWithObjs = await prisma.user.findMany({
-    where: { id: { in: users.map(u => u.id) } },
+async function LeadDashboard({ leadId, quarterName, title }: { leadId: string; quarterName: string; title: string }) {
+  const objectives = await prisma.objective.findMany({
+    where: { userId: leadId },
+    include: { keyResults: true },
+    orderBy: { createdAt: "asc" },
+  });
+
+  const members = await prisma.teamMember.findMany({
+    where: { leadId },
     include: {
-      objectives: {
-        include: { keyResults: true },
-      },
+      assignments: true,
     },
     orderBy: { name: "asc" },
   });
 
-  const submitted = usersWithObjs.filter(u => u.objectives.length > 0 && u.objectives.every(o => o.status === "SUBMITTED"));
-  const notSubmitted = usersWithObjs.filter(u => u.objectives.length === 0 || u.objectives.some(o => o.status === "DRAFT"));
-  const divisionAchievement = usersWithObjs.length > 0
-    ? usersWithObjs.reduce((s, u) => s + calcUserAchievement(u.objectives), 0) / usersWithObjs.length
-    : 0;
+  const divAchievement = members.length > 0
+    ? members.reduce((s, m) => s + calcMemberAchievement(m.assignments, objectives), 0) / members.length
+    : calcUserAchievement(objectives);
 
   return (
     <div className="space-y-6">
@@ -53,80 +51,69 @@ async function DivisionView({ users, quarterName, title }: {
           <p className="text-gray-500 text-sm mt-0.5">{quarterName}</p>
         </div>
         <div className="bg-yellow-400 rounded-2xl px-6 py-3 text-center">
-          <p className="text-xs font-semibold text-gray-700">Pencapaian OKR Divisi</p>
-          <p className="text-3xl font-bold text-gray-900">{divisionAchievement.toFixed(2)}%</p>
+          <p className="text-xs font-semibold text-gray-700">Pencapaian Divisi</p>
+          <p className="text-3xl font-bold text-gray-900">{divAchievement.toFixed(2)}%</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-green-50 border border-green-200 rounded-2xl p-4">
-          <p className="text-2xl font-bold text-green-700">{submitted.length}</p>
-          <p className="text-sm text-green-600 font-medium">Sudah Kumpulkan OKR</p>
-          <div className="mt-2 space-y-1">
-            {submitted.map(u => <p key={u.id} className="text-xs text-green-600">✓ {u.name}</p>)}
-          </div>
-        </div>
-        <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4">
-          <p className="text-2xl font-bold text-orange-600">{notSubmitted.length}</p>
-          <p className="text-sm text-orange-600 font-medium">Belum Kumpulkan OKR</p>
-          <div className="mt-2 space-y-1">
-            {notSubmitted.map(u => <p key={u.id} className="text-xs text-orange-600">○ {u.name}</p>)}
-          </div>
-        </div>
+      {/* Objectives overview */}
+      <div className="space-y-3">
+        {objectives.map((obj) => {
+          const oa = calcObjectiveAchievement(obj);
+          return (
+            <div key={obj.id} className="bg-white rounded-2xl shadow-sm p-4">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-semibold text-gray-800">{obj.title}</h3>
+                <Badge value={oa} />
+              </div>
+              <ProgressBar value={oa} />
+              <div className="mt-3 space-y-2">
+                {obj.keyResults.map((kr) => (
+                  <LeadOverride key={kr.id} kr={JSON.parse(JSON.stringify(kr))} />
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <div className="px-4 py-3 border-b bg-gray-50">
-          <h2 className="font-semibold text-gray-700 text-sm">Detail Pencapaian per Anggota</h2>
-        </div>
-        <div className="divide-y">
-          {usersWithObjs.map(user => {
-            const achievement = calcUserAchievement(user.objectives);
-            const allDone = user.objectives.length > 0 && user.objectives.every(o => o.status === "SUBMITTED");
-            return (
-              <div key={user.id} className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-700 font-bold text-sm">
-                      {user.name.charAt(0).toUpperCase()}
+      {/* Per-member achievement */}
+      {members.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b bg-gray-50">
+            <h2 className="font-semibold text-gray-700 text-sm">Pencapaian per Anggota</h2>
+          </div>
+          <div className="divide-y">
+            {members.map((m) => {
+              const achievement = calcMemberAchievement(m.assignments, objectives);
+              return (
+                <div key={m.id} className="px-4 py-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-yellow-100 flex items-center justify-center text-yellow-700 font-bold text-xs">
+                        {m.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="font-medium text-gray-800 text-sm">{m.name}</span>
                     </div>
-                    <div>
-                      <p className="font-medium text-gray-800 text-sm">{user.name}</p>
-                      <p className="text-xs text-gray-400">{user.division ?? "–"}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge status={allDone ? "SUBMITTED" : "DRAFT"} />
                     <Badge value={achievement} />
                   </div>
+                  <ProgressBar value={achievement} size="sm" />
+                  <div className="mt-1.5 pl-9 flex flex-wrap gap-x-3 gap-y-0.5">
+                    {m.assignments.map((a) => {
+                      const obj = objectives.find((o) => o.id === a.objectiveId);
+                      return obj ? (
+                        <span key={a.id} className="text-xs text-gray-400">
+                          {obj.title} <span className="text-gray-500 font-medium">{a.weight}%</span>
+                        </span>
+                      ) : null;
+                    })}
+                  </div>
                 </div>
-                <ProgressBar value={achievement} />
-
-                {user.objectives.map(obj => {
-                  const oa = calcObjectiveAchievement(obj);
-                  return (
-                    <div key={obj.id} className="mt-3 pl-10">
-                      <div className="flex items-center justify-between text-xs mb-1">
-                        <span className="text-gray-600 truncate">{obj.title}</span>
-                        <span className="text-gray-400 ml-2 flex-shrink-0">{obj.weight}% bobot · {oa.toFixed(0)}%</span>
-                      </div>
-                      <ProgressBar value={oa} size="sm" />
-
-                      {/* Lead override per KR */}
-                      {obj.keyResults.map(kr => (
-                        <LeadOverride key={kr.id} kr={JSON.parse(JSON.stringify(kr))} />
-                      ))}
-                    </div>
-                  );
-                })}
-                {user.objectives.length === 0 && (
-                  <p className="text-xs text-gray-400 mt-2 pl-10">Belum ada OKR</p>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
@@ -146,61 +133,84 @@ export default async function DashboardPage() {
     );
   }
 
-  /* ─── ADMIN: semua divisi ─── */
+  /* ─── ADMIN ─── */
   if (session!.user.role === "ADMIN") {
-    const allUsers = await prisma.user.findMany({ where: { role: { not: "ADMIN" } }, orderBy: { name: "asc" } });
-    return <DivisionView users={allUsers} quarterName={activeQuarter.name} title="Dashboard Semua Divisi" />;
-  }
-
-  /* ─── LEAD: divisi sendiri ─── */
-  if (session!.user.role === "LEAD") {
-    const divisionUsers = await prisma.user.findMany({
-      where: { division: session!.user.division ?? "", role: "MEMBER" },
+    const leads = await prisma.user.findMany({
+      where: { role: "LEAD" },
       orderBy: { name: "asc" },
     });
-    return <DivisionView users={divisionUsers} quarterName={activeQuarter.name} title={`Dashboard — ${session!.user.division ?? "Divisi Saya"}`} />;
+    return (
+      <div className="space-y-8">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Dashboard Semua Divisi</h1>
+          <p className="text-gray-500 text-sm">{activeQuarter.name}</p>
+        </div>
+        {leads.map((lead) => (
+          <div key={lead.id} className="border-t pt-6">
+            <LeadDashboard
+              leadId={lead.id}
+              quarterName={activeQuarter.name}
+              title={lead.division ?? lead.name}
+            />
+          </div>
+        ))}
+        {leads.length === 0 && (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 text-gray-500">
+            Belum ada Lead Divisi. Tambahkan di Admin → Pengguna.
+          </div>
+        )}
+      </div>
+    );
   }
 
-  /* ─── MEMBER: diri sendiri ─── */
+  /* ─── LEAD ─── */
+  if (session!.user.role === "LEAD") {
+    return (
+      <LeadDashboard
+        leadId={session!.user.id}
+        quarterName={activeQuarter.name}
+        title={`Dashboard — ${session!.user.division ?? "Divisi Saya"}`}
+      />
+    );
+  }
+
+  /* ─── MEMBER ─── */
   const myObjectives = await prisma.objective.findMany({
     where: { userId: session!.user.id, quarterId: activeQuarter.id },
     include: { keyResults: true },
     orderBy: { createdAt: "asc" },
   });
-
   const myAchievement = calcUserAchievement(myObjectives);
-  const allSubmitted = myObjectives.length > 0 && myObjectives.every(o => o.status === "SUBMITTED");
+  const allSubmitted = myObjectives.length > 0 && myObjectives.every((o) => o.status === "SUBMITTED");
 
   return (
     <div className="space-y-5">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800">Dashboard Saya</h1>
-          <p className="text-gray-500 text-sm mt-0.5">{activeQuarter.name}</p>
+          <p className="text-gray-500 text-sm">{activeQuarter.name}</p>
         </div>
         <div className="bg-yellow-400 rounded-2xl px-6 py-3 text-center">
           <p className="text-xs font-semibold text-gray-700">Pencapaian OKR</p>
           <p className="text-3xl font-bold text-gray-900">{myAchievement.toFixed(2)}%</p>
         </div>
       </div>
-
       {allSubmitted ? (
         <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-green-700 text-sm font-medium">
-          ✓ OKR kamu sudah dikumpulkan. Progress masih bisa diupdate.
+          ✓ OKR kamu sudah dikumpulkan.
         </div>
       ) : myObjectives.length > 0 ? (
         <div className="bg-orange-50 border border-orange-200 rounded-xl px-4 py-3 text-orange-700 text-sm">
-          OKR belum dikumpulkan. Pergi ke <a href="/okr" className="underline font-semibold">OKR Saya</a> untuk mengumpulkan.
+          OKR belum dikumpulkan. <a href="/okr" className="underline font-semibold">Kumpulkan →</a>
         </div>
       ) : null}
-
       {myObjectives.length === 0 ? (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 text-blue-700">
           Belum ada OKR. <a href="/okr" className="underline font-semibold">Isi OKR sekarang →</a>
         </div>
       ) : (
         <div className="space-y-3">
-          {myObjectives.map(obj => {
+          {myObjectives.map((obj) => {
             const oa = calcObjectiveAchievement(obj);
             return (
               <div key={obj.id} className="bg-white rounded-2xl shadow-sm p-5">
@@ -209,14 +219,14 @@ export default async function DashboardPage() {
                     <h2 className="font-semibold text-gray-800 truncate">{obj.title}</h2>
                     <StatusBadge status={obj.status} />
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                  <div className="flex items-center gap-2 ml-2">
                     <span className="text-xs text-gray-400">Bobot {obj.weight}%</span>
                     <Badge value={oa} />
                   </div>
                 </div>
                 <ProgressBar value={oa} />
                 <div className="mt-3 space-y-2">
-                  {obj.keyResults.map(kr => {
+                  {obj.keyResults.map((kr) => {
                     const progress = kr.leadProgress ?? kr.teamProgress;
                     const pct = kr.target > 0 ? Math.min((progress / kr.target) * 100, 100) : 0;
                     return (

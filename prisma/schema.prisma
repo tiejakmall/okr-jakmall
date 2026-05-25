@@ -19,15 +19,16 @@ enum OKRStatus {
 }
 
 model User {
-  id         String      @id @default(cuid())
-  name       String
-  email      String      @unique
-  password   String
-  role       Role        @default(MEMBER)
-  division   String?
-  objectives Objective[]
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  id          String       @id @default(cuid())
+  name        String
+  email       String       @unique
+  password    String
+  role        Role         @default(MEMBER)
+  division    String?
+  objectives  Objective[]
+  teamMembers TeamMember[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 model Quarter {
@@ -45,18 +46,39 @@ model Quarter {
 }
 
 model Objective {
-  id          String      @id @default(cuid())
+  id          String                @id @default(cuid())
   title       String
-  weight      Float       @default(100)
-  status      OKRStatus   @default(DRAFT)
+  weight      Float                 @default(100)
+  status      OKRStatus             @default(DRAFT)
   submittedAt DateTime?
   userId      String
-  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   quarterId   String
-  quarter     Quarter     @relation(fields: [quarterId], references: [id], onDelete: Cascade)
+  quarter     Quarter               @relation(fields: [quarterId], references: [id], onDelete: Cascade)
   keyResults  KeyResult[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  assignments ObjectiveAssignment[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+}
+
+model TeamMember {
+  id          String                @id @default(cuid())
+  name        String
+  leadId      String
+  lead        User                  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  assignments ObjectiveAssignment[]
+  createdAt   DateTime              @default(now())
+}
+
+model ObjectiveAssignment {
+  id          String     @id @default(cuid())
+  weight      Float
+  memberId    String
+  member      TeamMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  objectiveId String
+  objective   Objective  @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+
+  @@unique([memberId, objectiveId])
 }
 
 model KeyResult {
