@@ -181,8 +181,6 @@ export default function OKRManager({ initialObjectives, quarterId, userId }: Pro
         target: Number(kr.target),
         unit: kr.unit,
         weight: Number(kr.weight),
-        teamProgress: Number(kr.teamProgress),
-        leadProgress: kr.leadProgress !== null ? Number(kr.leadProgress) : null,
       }),
     });
     setSaving(false);
@@ -374,7 +372,7 @@ export default function OKRManager({ initialObjectives, quarterId, userId }: Pro
                           )}
                         </div>
 
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-gray-600 mb-2">
+                        <div className="grid grid-cols-3 gap-2 text-xs text-gray-600 mb-2">
                           <div>
                             <label className="block text-gray-400 mb-0.5">Target</label>
                             <input
@@ -412,19 +410,10 @@ export default function OKRManager({ initialObjectives, quarterId, userId }: Pro
                               max={100}
                             />
                           </div>
-                          <div>
-                            {/* Progress selalu bisa diisi meski locked */}
-                            <label className="block text-gray-400 mb-0.5">Progress</label>
-                            <input
-                              type="number"
-                              className="w-full border border-gray-200 rounded px-2 py-1 focus:outline-none focus:border-yellow-400"
-                              value={kr.teamProgress}
-                              onChange={(e) => updateKR(obj.id, kr.id, { teamProgress: Number(e.target.value) })}
-                              onBlur={() => saveKR(kr)}
-                              min={0}
-                            />
-                          </div>
                         </div>
+                        <p className="text-xs text-gray-400 italic mb-2">
+                          Progress diisi oleh anggota di bagian Distribusi Anggota ↓
+                        </p>
 
                         {/* Progress bar per KR */}
                         <div className="flex items-center gap-2 mt-1">
@@ -437,9 +426,6 @@ export default function OKRManager({ initialObjectives, quarterId, userId }: Pro
                           <span className="text-xs font-semibold text-gray-500 w-10 text-right">{pct.toFixed(0)}%</span>
                         </div>
 
-                        {kr.leadProgress !== null && (
-                          <p className="text-xs text-blue-500 mt-1">Lead override: {kr.leadProgress} {kr.unit}</p>
-                        )}
                       </div>
                     );
                   })}

@@ -1,5 +1,6 @@
-type KR = {
+export type KR = {
   id: string;
+  title: string;
   target: number;
   unit: string;
   weight: number;
@@ -7,8 +8,9 @@ type KR = {
   leadProgress: number | null;
 };
 
-type ObjWithKRs = {
+export type ObjWithKRs = {
   id: string;
+  title: string;
   weight: number;
   keyResults: KR[];
 };
@@ -16,6 +18,7 @@ type ObjWithKRs = {
 type KRAssignment = {
   keyResultId: string;
   weight: number;
+  progress: number;
 };
 
 type Assignment = {
@@ -41,6 +44,27 @@ export function calcObjectiveAchievement(obj: ObjWithKRs): number {
   );
 }
 
+// Aggregate teamProgress per KR from all member KRAssignments (sum of contributions)
+export function aggregateKRProgress(
+  objectives: ObjWithKRs[],
+  allKRAssignments: KRAssignment[]
+): ObjWithKRs[] {
+  // Build map: keyResultId → total progress (sum)
+  const progressMap = new Map<string, number>();
+  for (const kra of allKRAssignments) {
+    progressMap.set(kra.keyResultId, (progressMap.get(kra.keyResultId) ?? 0) + kra.progress);
+  }
+
+  return objectives.map((obj) => ({
+    ...obj,
+    keyResults: obj.keyResults.map((kr) => {
+      const aggregated = progressMap.get(kr.id);
+      if (aggregated === undefined) return kr; // no member assigned → keep original
+      return { ...kr, teamProgress: aggregated };
+    }),
+  }));
+}
+
 // Hitung achievement objective pakai KR weights khusus per member
 function calcObjectiveAchievementForMember(obj: ObjWithKRs, krAssignments: KRAssignment[]): number {
   if (krAssignments.length === 0) return calcObjectiveAchievement(obj);
@@ -49,11 +73,13 @@ function calcObjectiveAchievementForMember(obj: ObjWithKRs, krAssignments: KRAss
   return krAssignments.reduce((s: number, kra: KRAssignment) => {
     const kr = obj.keyResults.find((k) => k.id === kra.keyResultId);
     if (!kr) return s;
-    return s + (calcKRAchievement(kr) * kra.weight) / totalWeight;
+    // Per member, use their own progress for this KR
+    const memberKR: KR = { ...kr, teamProgress: kra.progress, leadProgress: null };
+    return s + (calcKRAchievement(memberKR) * kra.weight) / totalWeight;
   }, 0);
 }
 
-// Hitung pencapaian member berdasarkan assignment ke objectives + KR weights per member
+// Hitung pencapaian member berdasarkan assignment ke objectives + KR progress mereka sendiri
 export function calcMemberAchievement(assignments: Assignment[], objectives: ObjWithKRs[]): number {
   if (assignments.length === 0) return 0;
   const objMap = new Map(objectives.map((o) => [o.id, o]));

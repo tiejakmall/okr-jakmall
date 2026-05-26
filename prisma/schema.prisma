@@ -85,6 +85,7 @@ model ObjectiveAssignment {
 model KRAssignment {
   id           String              @id @default(cuid())
   weight       Float               @default(0)
+  progress     Float               @default(0)
   assignmentId String
   assignment   ObjectiveAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   keyResultId  String

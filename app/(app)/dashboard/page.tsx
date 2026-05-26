@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { calcUserAchievement, calcObjectiveAchievement, calcMemberAchievement } from "@/lib/calculations";
+import { calcUserAchievement, calcObjectiveAchievement, calcMemberAchievement, aggregateKRProgress } from "@/lib/calculations";
 import LeadOverride from "./LeadOverride";
 
 function ProgressBar({ value, size = "md" }: { value: number; size?: "sm" | "md" }) {
@@ -25,7 +25,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 async function LeadDashboard({ leadId, quarterName, title }: { leadId: string; quarterName: string; title: string }) {
-  const objectives = await prisma.objective.findMany({
+  const objectivesRaw = await prisma.objective.findMany({
     where: { userId: leadId },
     include: { keyResults: true },
     orderBy: { createdAt: "asc" },
@@ -38,6 +38,10 @@ async function LeadDashboard({ leadId, quarterName, title }: { leadId: string; q
     },
     orderBy: { name: "asc" },
   });
+
+  // Aggregate KR progress from all member KR assignments
+  const allKRAssignments = members.flatMap((m) => m.assignments.flatMap((a) => a.krAssignments));
+  const objectives = aggregateKRProgress(objectivesRaw, allKRAssignments);
 
   const divAchievement = members.length > 0
     ? members.reduce((s, m) => s + calcMemberAchievement(m.assignments, objectives), 0) / members.length
@@ -68,9 +72,22 @@ async function LeadDashboard({ leadId, quarterName, title }: { leadId: string; q
               </div>
               <ProgressBar value={oa} />
               <div className="mt-3 space-y-2">
-                {obj.keyResults.map((kr) => (
-                  <LeadOverride key={kr.id} kr={JSON.parse(JSON.stringify(kr))} />
-                ))}
+                {obj.keyResults.map((kr) => {
+                  const progress = kr.leadProgress ?? kr.teamProgress;
+                  const pct = kr.target > 0 ? Math.min((progress / kr.target) * 100, 100) : 0;
+                  return (
+                    <div key={kr.id} className="text-sm">
+                      <div className="flex justify-between text-gray-600 mb-1">
+                        <span className="truncate">{kr.title}</span>
+                        <span className="font-medium ml-2 flex-shrink-0">
+                          {progress}/{kr.target} {kr.unit} · {pct.toFixed(0)}%
+                          {kr.leadProgress !== null && <span className="text-blue-500 ml-1">(override lead)</span>}
+                        </span>
+                      </div>
+                      <ProgressBar value={pct} size="sm" />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
