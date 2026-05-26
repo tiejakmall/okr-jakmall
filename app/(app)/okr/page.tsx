@@ -32,7 +32,10 @@ export default async function OKRPage() {
         where: { leadId: session!.user.id },
         include: {
           assignments: {
-            include: { objective: { select: { id: true, title: true } } },
+            include: {
+              objective: { select: { id: true, title: true } },
+              krAssignments: true,
+            },
           },
         },
         orderBy: { name: "asc" },
@@ -64,7 +67,7 @@ export default async function OKRPage() {
           <div className="mb-4">
             <h2 className="text-xl font-bold text-gray-800">Distribusi ke Anggota</h2>
             <p className="text-gray-500 text-sm mt-0.5">
-              Assign anggota ke objective. Total bobot per anggota harus 100%.
+              Assign anggota ke objective + key result. Bobot objective harus 100%, bobot KR per objective harus 100%.
             </p>
           </div>
           <DistribusiAnggota

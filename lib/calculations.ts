@@ -1,4 +1,5 @@
 type KR = {
+  id: string;
   target: number;
   unit: string;
   weight: number;
@@ -12,10 +13,16 @@ type ObjWithKRs = {
   keyResults: KR[];
 };
 
+type KRAssignment = {
+  keyResultId: string;
+  weight: number;
+};
+
 type Assignment = {
   weight: number;
   objectiveId: string;
   objective?: ObjWithKRs;
+  krAssignments?: KRAssignment[];
 };
 
 export function calcKRAchievement(kr: KR): number {
@@ -34,7 +41,19 @@ export function calcObjectiveAchievement(obj: ObjWithKRs): number {
   );
 }
 
-// Hitung pencapaian berdasarkan assignment ke objectives
+// Hitung achievement objective pakai KR weights khusus per member
+function calcObjectiveAchievementForMember(obj: ObjWithKRs, krAssignments: KRAssignment[]): number {
+  if (krAssignments.length === 0) return calcObjectiveAchievement(obj);
+  const totalWeight = krAssignments.reduce((s: number, kra: KRAssignment) => s + kra.weight, 0);
+  if (totalWeight === 0) return calcObjectiveAchievement(obj);
+  return krAssignments.reduce((s: number, kra: KRAssignment) => {
+    const kr = obj.keyResults.find((k) => k.id === kra.keyResultId);
+    if (!kr) return s;
+    return s + (calcKRAchievement(kr) * kra.weight) / totalWeight;
+  }, 0);
+}
+
+// Hitung pencapaian member berdasarkan assignment ke objectives + KR weights per member
 export function calcMemberAchievement(assignments: Assignment[], objectives: ObjWithKRs[]): number {
   if (assignments.length === 0) return 0;
   const objMap = new Map(objectives.map((o) => [o.id, o]));
@@ -43,7 +62,11 @@ export function calcMemberAchievement(assignments: Assignment[], objectives: Obj
   return assignments.reduce((s: number, a: Assignment) => {
     const obj = a.objective ?? objMap.get(a.objectiveId);
     if (!obj) return s;
-    return s + (calcObjectiveAchievement(obj) * a.weight) / totalWeight;
+    const objAchievement =
+      a.krAssignments && a.krAssignments.length > 0
+        ? calcObjectiveAchievementForMember(obj, a.krAssignments)
+        : calcObjectiveAchievement(obj);
+    return s + (objAchievement * a.weight) / totalWeight;
   }, 0);
 }
 

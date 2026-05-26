@@ -71,26 +71,39 @@ model TeamMember {
 }
 
 model ObjectiveAssignment {
-  id          String     @id @default(cuid())
-  weight      Float
-  memberId    String
-  member      TeamMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
-  objectiveId String
-  objective   Objective  @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  id            String         @id @default(cuid())
+  weight        Float
+  memberId      String
+  member        TeamMember     @relation(fields: [memberId], references: [id], onDelete: Cascade)
+  objectiveId   String
+  objective     Objective      @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  krAssignments KRAssignment[]
 
   @@unique([memberId, objectiveId])
 }
 
+model KRAssignment {
+  id           String              @id @default(cuid())
+  weight       Float               @default(0)
+  assignmentId String
+  assignment   ObjectiveAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  keyResultId  String
+  keyResult    KeyResult           @relation(fields: [keyResultId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, keyResultId])
+}
+
 model KeyResult {
-  id           String    @id @default(cuid())
-  title        String
-  target       Float
-  unit         String
-  weight       Float
-  teamProgress Float     @default(0)
-  leadProgress Float?
-  objectiveId  String
-  objective    Objective @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  id            String         @id @default(cuid())
+  title         String
+  target        Float
+  unit          String
+  weight        Float
+  teamProgress  Float          @default(0)
+  leadProgress  Float?
+  objectiveId   String
+  objective     Objective      @relation(fields: [objectiveId], references: [id], onDelete: Cascade)
+  krAssignments KRAssignment[]
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 }

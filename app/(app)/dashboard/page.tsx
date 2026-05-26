@@ -34,7 +34,7 @@ async function LeadDashboard({ leadId, quarterName, title }: { leadId: string; q
   const members = await prisma.teamMember.findMany({
     where: { leadId },
     include: {
-      assignments: true,
+      assignments: { include: { krAssignments: true } },
     },
     orderBy: { name: "asc" },
   });
