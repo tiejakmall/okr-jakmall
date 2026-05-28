@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine,
-} from "recharts";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -51,50 +49,59 @@ function ProgressBar({ value, size = "md" }: { value: number; size?: "xs" | "sm"
 
 function KRChart({ keyResults }: { keyResults: KRData[] }) {
   if (keyResults.length === 0) return null;
-  const data = keyResults.map((kr) => ({
-    name: kr.title.length > 22 ? kr.title.slice(0, 22) + "…" : kr.title,
-    achievement: parseFloat(kr.achievement.toFixed(1)),
-  }));
   return (
-    <div className="mt-4 h-36">
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 36, left: 0, bottom: 0 }}>
-          <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#f1f5f9" />
-          <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} unit="%" />
-          <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-          <Tooltip formatter={(v) => [`${v}%`, "Pencapaian"]} contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }} />
-          <ReferenceLine x={100} stroke="#94a3b8" strokeDasharray="4 2" />
-          <Bar dataKey="achievement" radius={[0, 4, 4, 0]} maxBarSize={18}>
-            {data.map((d, i) => (
-              <Cell key={i} fill={barColor(d.achievement)} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+    <div className="mt-4 space-y-2.5">
+      {keyResults.map((kr) => (
+        <div key={kr.id}>
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <span className="text-xs text-slate-600 leading-snug">{kr.title}</span>
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-lg flex-shrink-0 ${achClass(kr.achievement)}`}>
+              {kr.achievement.toFixed(0)}%
+            </span>
+          </div>
+          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div
+              className="h-2 rounded-full transition-all"
+              style={{ width: `${Math.min(kr.achievement, 100)}%`, backgroundColor: barColor(kr.achievement) }}
+            />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
 
 // ─── Objective section ────────────────────────────────────────────────────────
 
-function ObjectiveSection({ obj }: { obj: ObjData }) {
+function ObjectiveSection({ obj, index }: { obj: ObjData; index: number }) {
+  const [open, setOpen] = useState(true);
   const [showContrib, setShowContrib] = useState(false);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
       {/* Objective header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-5 py-4 bg-slate-50 hover:bg-slate-100 transition-colors text-left group"
+      >
         <div className="flex items-center gap-3 min-w-0">
-          <span className="text-lg">🎯</span>
+          <span className="text-lg flex-shrink-0">🎯</span>
           <div className="min-w-0">
-            <h3 className="font-bold text-slate-800 text-sm truncate">{obj.title}</h3>
+            <p className="text-xs font-semibold text-amber-600 mb-0.5">Objective #{index + 1}</p>
+            <h3 className="font-bold text-slate-800 text-sm leading-snug">{obj.title}</h3>
             <span className="text-xs text-slate-400">⚖️ Bobot {obj.weight}%</span>
           </div>
         </div>
-        <PctBadge value={obj.achievement} />
-      </div>
+        <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+          <PctBadge value={obj.achievement} />
+          <span className="text-slate-300 group-hover:text-slate-500 transition-colors">
+            {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </span>
+        </div>
+      </button>
 
-      <div className="px-5 py-2 border-b border-slate-100">
+      {open && <>
+      <div className="px-5 py-2 border-t border-slate-100">
         <ProgressBar value={obj.achievement} />
       </div>
 
@@ -216,6 +223,7 @@ function ObjectiveSection({ obj }: { obj: ObjData }) {
           </div>
         )}
       </div>
+      </>}
     </div>
   );
 }
@@ -304,8 +312,8 @@ export default function DivisionView({ quarters, leadId, divisionName }: Props) 
         <>
           {/* Objective cards */}
           <div className="space-y-5">
-            {data.objectives.map((obj) => (
-              <ObjectiveSection key={obj.id} obj={obj} />
+            {data.objectives.map((obj, i) => (
+              <ObjectiveSection key={obj.id} obj={obj} index={i} />
             ))}
           </div>
 
