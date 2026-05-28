@@ -123,13 +123,13 @@ function ObjectiveSection({ obj, index }: { obj: ObjData; index: number }) {
               </thead>
               <tbody>
                 {obj.keyResults.map((kr) => {
-                  const progress = kr.leadProgress ?? kr.teamProgress;
+                  const progress = kr.teamProgress + (kr.leadProgress ?? 0);
                   return (
                     <tr key={kr.id} className="border-b border-slate-50 last:border-0">
                       <td className="py-2.5 pr-3 font-medium text-slate-700 max-w-[180px]">
                         <span className="truncate block">{kr.title}</span>
-                        {kr.leadProgress !== null && (
-                          <span className="text-xs text-blue-500">🔒 override</span>
+                        {kr.leadProgress != null && kr.leadProgress > 0 && (
+                          <span className="text-xs text-blue-500">➕ lead: {kr.leadProgress}</span>
                         )}
                       </td>
                       <td className="py-2.5 px-2 text-right text-slate-600 tabular-nums">{kr.target}</td>
@@ -281,8 +281,28 @@ export default function DivisionView({ quarters, leadId, divisionName }: Props) 
           </div>
         </div>
 
+        <div className="flex items-center gap-3 flex-wrap print:hidden">
+          {data && (
+            <div className={`border rounded-2xl px-6 py-3 text-center ${achBg}`}>
+              <p className="text-xs font-semibold mb-0.5">🏆 Pencapaian Divisi</p>
+              <p className="text-3xl font-bold leading-tight">{data.divisionAchievement.toFixed(1)}%</p>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-[0_2px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-px transition-all duration-75"
+            >🖨️ Print PDF</button>
+            {selectedQ && (
+              <a
+                href={`/api/dashboard/division/export?leadId=${leadId}&quarterId=${selectedQ}&divisionName=${encodeURIComponent(divisionName)}`}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-[0_2px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-px transition-all duration-75"
+              >📊 Excel</a>
+            )}
+          </div>
+        </div>
         {data && (
-          <div className={`border rounded-2xl px-6 py-3 text-center ${achBg}`}>
+          <div className={`border rounded-2xl px-6 py-3 text-center hidden print:block ${achBg}`}>
             <p className="text-xs font-semibold mb-0.5">🏆 Pencapaian Divisi</p>
             <p className="text-3xl font-bold leading-tight">{data.divisionAchievement.toFixed(1)}%</p>
           </div>

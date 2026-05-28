@@ -87,13 +87,13 @@ function ObjectiveCard({ obj, oa, index }: { obj: Objective; oa: number; index: 
               </thead>
               <tbody>
                 {obj.keyResults.map((kr) => {
-                  const progress = kr.leadProgress ?? kr.teamProgress;
+                  const progress = kr.teamProgress + (kr.leadProgress ?? 0);
                   const pct = kr.target > 0 ? Math.min((progress / kr.target) * 100, 100) : 0;
                   return (
                     <tr key={kr.id} className="border-b border-slate-50 last:border-0">
                       <td className="py-2.5 pr-3 font-medium text-slate-700">
                         <span className="block">{kr.title}</span>
-                        {kr.leadProgress !== null && <span className="text-xs text-blue-500">🔒 lead</span>}
+                        {kr.leadProgress != null && kr.leadProgress > 0 && <span className="text-xs text-blue-500">➕ lead: {kr.leadProgress}</span>}
                       </td>
                       <td className="py-2.5 px-2 text-right text-slate-600 tabular-nums">{kr.target}</td>
                       <td className="py-2.5 px-2 text-right text-slate-400">{kr.unit}</td>

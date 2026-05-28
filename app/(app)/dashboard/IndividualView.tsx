@@ -295,12 +295,26 @@ export default function IndividualView({ quarters, members, leadId }: Props) {
           </div>
         </div>
 
-        {data && data.assignments.length > 0 && (
-          <div className={`border rounded-2xl px-6 py-3 text-center ${achBg}`}>
-            <p className="text-xs font-semibold mb-0.5">🏆 Pencapaian</p>
-            <p className="text-3xl font-bold leading-tight">{data.achievement.toFixed(1)}%</p>
+        <div className="flex items-center gap-3 flex-wrap">
+          {data && data.assignments.length > 0 && (
+            <div className={`border rounded-2xl px-6 py-3 text-center ${achBg}`}>
+              <p className="text-xs font-semibold mb-0.5">🏆 Pencapaian</p>
+              <p className="text-3xl font-bold leading-tight">{data.achievement.toFixed(1)}%</p>
+            </div>
+          )}
+          <div className="flex gap-2 print:hidden">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-[0_2px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-px transition-all duration-75"
+            >🖨️ Print PDF</button>
+            {selectedMember && selectedQ && (
+              <a
+                href={`/api/dashboard/individual/export?memberId=${selectedMember}&quarterId=${selectedQ}&leadId=${leadId}`}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-[0_2px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-px transition-all duration-75"
+              >📊 Excel</a>
+            )}
           </div>
-        )}
+        </div>
       </div>
 
       {members.length === 0 && (

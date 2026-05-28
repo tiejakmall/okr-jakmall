@@ -104,6 +104,7 @@ export default async function OKRPage({ searchParams }: { searchParams: Promise<
           quarterId={selectedQuarter.id}
           userId={session!.user.id}
           allQuarters={JSON.parse(JSON.stringify(quarters))}
+          isLead={isLead}
         />
       </CollapsibleSection>
 

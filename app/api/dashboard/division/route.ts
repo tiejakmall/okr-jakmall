@@ -64,7 +64,7 @@ export async function GET(req: Request) {
       achievement,
       keyResults: obj.keyResults.map((kr) => {
         const krAchievement = kr.target > 0
-          ? Math.min((( kr.leadProgress ?? kr.teamProgress) / kr.target) * 100, 100)
+          ? Math.min(((kr.teamProgress + (kr.leadProgress ?? 0)) / kr.target) * 100, 100)
           : 0;
         const contribs = krContribMap.get(kr.id) ?? [];
         return {

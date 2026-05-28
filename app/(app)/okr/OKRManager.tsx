@@ -36,6 +36,7 @@ type Props = {
   quarterId: string;
   userId: string;
   allQuarters: Quarter[];
+  isLead?: boolean;
 };
 
 const UNITS = ["%", "pcs", "x", "score", "hari", "bulan", "orang", "lainnya"];
@@ -312,7 +313,7 @@ function ImportModal({
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function OKRManager({ initialObjectives, quarterId, userId, allQuarters }: Props) {
+export default function OKRManager({ initialObjectives, quarterId, userId, allQuarters, isLead }: Props) {
   const router = useRouter();
   const [objectives, setObjectives] = useState<Objective[]>(initialObjectives);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -453,6 +454,14 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
       body: JSON.stringify({ title: kr.title, target: Number(kr.target), unit: kr.unit, weight: Number(kr.weight) }),
     });
     setSaving(false);
+  }
+
+  async function saveLeadProgress(krId: string, value: number | null) {
+    await fetch(`/api/key-results/${krId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ leadProgress: value }),
+    });
   }
 
   async function deleteKR(objectiveId: string, krId: string) {
@@ -753,9 +762,38 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
                             </div>
                           </div>
 
-                          <p className="text-xs text-slate-400 italic mb-2">
-                            💡 Progress diisi oleh anggota di bagian Distribusi Anggota ↓
-                          </p>
+                          {isLead ? (
+                            <div className="flex items-center gap-2 mb-2">
+                              <span className="text-xs font-medium text-blue-600 flex-shrink-0">📝 Kontribusi saya</span>
+                              <input
+                                type="number"
+                                className="w-20 border border-blue-200 rounded-lg px-2 py-1 text-xs text-right bg-blue-50 focus:outline-none focus:border-blue-400"
+                                value={kr.leadProgress ?? ""}
+                                placeholder="0"
+                                min={0}
+                                onChange={(e) => {
+                                  const v = e.target.value === "" ? null : Number(e.target.value);
+                                  updateKR(obj.id, kr.id, { leadProgress: v });
+                                }}
+                                onBlur={(e) => {
+                                  const v = e.target.value === "" ? null : Number(e.target.value);
+                                  saveLeadProgress(kr.id, v);
+                                }}
+                              />
+                              <span className="text-xs text-slate-400">/ {kr.target} {kr.unit}</span>
+                              {(kr.leadProgress ?? 0) > 0 && (
+                                <button
+                                  onClick={() => { updateKR(obj.id, kr.id, { leadProgress: null }); saveLeadProgress(kr.id, null); }}
+                                  className="text-slate-300 hover:text-slate-500 text-xs transition"
+                                  title="Reset kontribusi"
+                                >✕</button>
+                              )}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-400 italic mb-2">
+                              💡 Progress diisi oleh anggota di bagian Distribusi Anggota ↓
+                            </p>
+                          )}
 
                           <div className="flex items-center gap-3">
                             <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">

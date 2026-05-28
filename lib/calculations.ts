@@ -30,7 +30,7 @@ type Assignment = {
 };
 
 export function calcKRAchievement(kr: KR): number {
-  const progress = kr.leadProgress ?? kr.teamProgress;
+  const progress = kr.teamProgress + (kr.leadProgress ?? 0);
   if (kr.target === 0) return 0;
   return Math.min((progress / kr.target) * 100, 100);
 }
