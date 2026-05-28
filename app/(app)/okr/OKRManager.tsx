@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, ChevronDown, ChevronUp, CheckSquare, Square, X } from "lucide-react";
 import { calcObjectiveAchievement, calcKRAchievement } from "@/lib/calculations";
@@ -121,6 +121,12 @@ function ImportModal({
   const [sourceId, setSourceId] = useState(otherQuarters[0]?.id ?? "");
   const [sourceObjs, setSourceObjs] = useState<Objective[]>([]);
   const [loadingObjs, setLoadingObjs] = useState(false);
+
+  // Auto-load objectives for the first quarter when modal opens
+  useEffect(() => {
+    if (sourceId) loadObjectives(sourceId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [importing, setImporting] = useState(false);
 

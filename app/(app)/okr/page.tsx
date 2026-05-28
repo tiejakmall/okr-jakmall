@@ -59,6 +59,7 @@ export default async function OKRPage({ searchParams }: { searchParams: Promise<
         where: { leadId: session!.user.id },
         include: {
           assignments: {
+            where: { objective: { quarterId: selectedQuarter.id } },
             include: {
               objective: { select: { id: true, title: true } },
               krAssignments: {
