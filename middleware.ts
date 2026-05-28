@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export function middleware(req: NextRequest) {
+  const allCookies = req.cookies.getAll();
+  const cookieNames = allCookies.map((c) => c.name).join(", ");
+  console.log(`[middleware] ${req.method} ${req.nextUrl.pathname} | cookies: ${cookieNames || "(none)"}`);
+
   const sessionCookie =
     req.cookies.get("__Secure-authjs.session-token") ??
     req.cookies.get("authjs.session-token");
   const isLoggedIn = !!sessionCookie?.value;
+
+  console.log(`[middleware] isLoggedIn=${isLoggedIn} sessionCookie=${sessionCookie?.name ?? "none"}`);
+
   const { pathname } = req.nextUrl;
 
   const isPublic =
