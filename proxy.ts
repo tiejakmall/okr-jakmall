@@ -2,22 +2,24 @@ import { NextRequest, NextResponse } from "next/server";
 import { getToken } from "next-auth/jwt";
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  const isLoginPage = pathname === "/login" || pathname.startsWith("/login/");
+
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET,
-    // On HTTPS (Vercel production) cookie name has __Secure- prefix
+    // On HTTPS (Vercel production) cookie has __Secure- prefix
     secureCookie: process.env.NODE_ENV === "production",
   });
 
-  const { pathname } = request.nextUrl;
-
-  if (!token) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  // Logged in → don't show login page again
+  if (token && isLoginPage) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // Redirect logged-in users away from login page
-  if (pathname === "/login") {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+  // Not logged in → send to login (unless already there)
+  if (!token && !isLoginPage) {
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   return NextResponse.next();
