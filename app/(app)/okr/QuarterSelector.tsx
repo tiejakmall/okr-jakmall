@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { ChevronDown, Plus, X } from "lucide-react";
 
 type Quarter = {
@@ -26,7 +25,6 @@ export default function QuarterSelector({
   selectedQuarterId: string | null;
   isLead: boolean;
 }) {
-  const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -38,7 +36,7 @@ export default function QuarterSelector({
   });
 
   function handleSelect(e: React.ChangeEvent<HTMLSelectElement>) {
-    router.push(`/okr?quarterId=${e.target.value}`);
+    window.location.href = `/okr?quarterId=${e.target.value}`;
   }
 
   async function createQuarter() {
@@ -64,8 +62,7 @@ export default function QuarterSelector({
         startDate: "",
         endDate: "",
       });
-      router.push(`/okr?quarterId=${q.id}`);
-      router.refresh();
+      window.location.href = `/okr?quarterId=${q.id}`;
     } finally {
       setSaving(false);
     }
