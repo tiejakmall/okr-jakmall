@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, ReferenceLine,
@@ -102,19 +103,31 @@ function TrendChart({ trend }: { trend: TrendPoint[] }) {
 function KRChart({ krs }: { krs: KRAData[] }) {
   if (krs.length === 0) return null;
   const data = krs.map((k) => ({
-    name: k.krTitle.length > 22 ? k.krTitle.slice(0, 22) + "…" : k.krTitle,
+    name: k.krTitle.length > 38 ? k.krTitle.slice(0, 38) + "…" : k.krTitle,
+    fullName: k.krTitle,
     achievement: parseFloat(k.achievement.toFixed(1)),
   }));
+  const chartHeight = Math.max(120, krs.length * 44);
   return (
-    <div className="mt-3 h-32">
+    <div className="mt-3" style={{ height: chartHeight }}>
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 36, left: 0, bottom: 0 }}>
+        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 40, left: 0, bottom: 0 }}>
           <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#f1f5f9" />
           <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} unit="%" />
-          <YAxis type="category" dataKey="name" width={130} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-          <Tooltip formatter={(v) => [`${v}%`, "Pencapaian"]} contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }} />
+          <YAxis
+            type="category"
+            dataKey="name"
+            width={200}
+            tick={{ fontSize: 10, fill: "#64748b" }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <Tooltip
+            formatter={(v, _name, props) => [`${v}%`, props.payload?.fullName ?? "Pencapaian"]}
+            contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0", maxWidth: 280 }}
+          />
           <ReferenceLine x={100} stroke="#94a3b8" strokeDasharray="4 2" />
-          <Bar dataKey="achievement" radius={[0, 4, 4, 0]} maxBarSize={16}>
+          <Bar dataKey="achievement" radius={[0, 4, 4, 0]} maxBarSize={18}>
             {data.map((d, i) => <Cell key={i} fill={barColor(d.achievement)} />)}
           </Bar>
         </BarChart>
@@ -125,79 +138,93 @@ function KRChart({ krs }: { krs: KRAData[] }) {
 
 // ─── Assignment section ────────────────────────────────────────────────────────
 
-function AssignmentSection({ a }: { a: AssignmentData }) {
+function AssignmentSection({ a, index }: { a: AssignmentData; index: number }) {
+  const [open, setOpen] = useState(true);
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-5 py-4 bg-slate-50 hover:bg-slate-100 transition-colors text-left group"
+      >
         <div className="flex items-center gap-3 min-w-0">
-          <span className="text-lg">🎯</span>
+          <span className="text-lg flex-shrink-0">🎯</span>
           <div className="min-w-0">
-            <h3 className="font-bold text-slate-800 text-sm truncate">{a.objectiveTitle}</h3>
+            <p className="text-xs font-semibold text-amber-600 mb-0.5">Objective #{index + 1}</p>
+            <h3 className="font-bold text-slate-800 text-sm leading-snug">{a.objectiveTitle}</h3>
             <span className="text-xs text-slate-400">⚖️ Bobot {a.weight}%</span>
           </div>
         </div>
-        <PctBadge value={a.achievement} />
-      </div>
-
-      <div className="px-5 py-2 border-b border-slate-100">
-        <ProgressBar value={a.achievement} size="xs" />
-      </div>
-
-      <div className="p-5 space-y-4">
-        {/* KR Table */}
-        <div>
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">🔑 Key Results (Kontribusi Saya)</p>
-          {a.krAssignments.length === 0 ? (
-            <p className="text-xs text-slate-400 italic">Belum ada KR yang di-assign.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-100">
-                    <th className="text-left py-2 pr-3 text-xs font-semibold text-slate-400">Key Result</th>
-                    <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Target</th>
-                    <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Satuan</th>
-                    <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Bobot</th>
-                    <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Progress Saya</th>
-                    <th className="text-right py-2 pl-2 text-xs font-semibold text-slate-400">Pencapaian</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {a.krAssignments.map((k) => (
-                    <tr key={k.kraId} className="border-b border-slate-50 last:border-0">
-                      <td className="py-2.5 pr-3 font-medium text-slate-700 max-w-[180px]">
-                        <span className="truncate block">{k.krTitle}</span>
-                        {k.individualTarget != null && (
-                          <span className="text-xs text-blue-500">⚡ target individu</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-2 text-right text-slate-600 tabular-nums">
-                        {k.target}
-                        {k.individualTarget != null && k.targetDivisi != null && k.targetDivisi !== k.target && (
-                          <span className="block text-xs text-slate-400">(divisi: {k.targetDivisi})</span>
-                        )}
-                      </td>
-                      <td className="py-2.5 px-2 text-right text-slate-400">{k.unit}</td>
-                      <td className="py-2.5 px-2 text-right font-semibold text-slate-600">{k.weight}%</td>
-                      <td className="py-2.5 px-2 text-right tabular-nums text-slate-700">
-                        {k.progress} / {k.target}
-                      </td>
-                      <td className="py-2.5 pl-2 text-right">
-                        <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${achClass(k.achievement)}`}>
-                          {k.achievement.toFixed(0)}%
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+        <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+          <PctBadge value={a.achievement} />
+          <span className="text-slate-300 group-hover:text-slate-500 transition-colors">
+            {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </span>
         </div>
+      </button>
 
-        {/* KR Chart */}
-        {a.krAssignments.length > 0 && <KRChart krs={a.krAssignments} />}
-      </div>
+      {open && (
+        <>
+          <div className="px-5 py-2 border-b border-slate-100">
+            <ProgressBar value={a.achievement} size="xs" />
+          </div>
+
+          <div className="p-5 space-y-4">
+            {/* KR Table */}
+            <div>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">🔑 Key Results (Kontribusi Saya)</p>
+              {a.krAssignments.length === 0 ? (
+                <p className="text-xs text-slate-400 italic">Belum ada KR yang di-assign.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100">
+                        <th className="text-left py-2 pr-3 text-xs font-semibold text-slate-400">Key Result</th>
+                        <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Target</th>
+                        <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Satuan</th>
+                        <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Bobot</th>
+                        <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Progress Saya</th>
+                        <th className="text-right py-2 pl-2 text-xs font-semibold text-slate-400">Pencapaian</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {a.krAssignments.map((k) => (
+                        <tr key={k.kraId} className="border-b border-slate-50 last:border-0">
+                          <td className="py-2.5 pr-3 font-medium text-slate-700 max-w-[180px]">
+                            <span className="truncate block">{k.krTitle}</span>
+                            {k.individualTarget != null && (
+                              <span className="text-xs text-blue-500">⚡ target individu</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-2 text-right text-slate-600 tabular-nums">
+                            {k.target}
+                            {k.individualTarget != null && k.targetDivisi != null && k.targetDivisi !== k.target && (
+                              <span className="block text-xs text-slate-400">(divisi: {k.targetDivisi})</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-2 text-right text-slate-400">{k.unit}</td>
+                          <td className="py-2.5 px-2 text-right font-semibold text-slate-600">{k.weight}%</td>
+                          <td className="py-2.5 px-2 text-right tabular-nums text-slate-700">
+                            {k.progress} / {k.target}
+                          </td>
+                          <td className="py-2.5 pl-2 text-right">
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${achClass(k.achievement)}`}>
+                              {k.achievement.toFixed(0)}%
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* KR Chart */}
+            {a.krAssignments.length > 0 && <KRChart krs={a.krAssignments} />}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -310,8 +337,8 @@ export default function IndividualView({ quarters, members, leadId }: Props) {
 
       {!loading && data && data.assignments.length > 0 && (
         <div className="space-y-5">
-          {data.assignments.map((a) => (
-            <AssignmentSection key={a.assignmentId} a={a} />
+          {data.assignments.map((a, i) => (
+            <AssignmentSection key={a.assignmentId} a={a} index={i} />
           ))}
         </div>
       )}

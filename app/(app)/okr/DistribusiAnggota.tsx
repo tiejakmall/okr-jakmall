@@ -261,6 +261,7 @@ function MemberCard({
   onKRProgressChange: (kraId: string, assignmentId: string, memberId: string, val: number) => void;
   onKRTargetChange: (kraId: string, assignmentId: string, memberId: string, val: number | null) => void;
 }) {
+  const [open, setOpen] = useState(true);
   const totalWeight = member.assignments.reduce((s, a) => s + Number(a.weight), 0);
   const assignedObjectiveIds = new Set(member.assignments.map((a) => a.objectiveId));
   const unassigned = objectives.filter((o) => !assignedObjectiveIds.has(o.id));
@@ -269,17 +270,21 @@ function MemberCard({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3.5 border-b border-slate-100">
-        <div className="flex items-center gap-3">
+      {/* Header — click anywhere except delete to toggle */}
+      <div
+        className="flex items-center justify-between px-4 py-3.5 cursor-pointer select-none hover:bg-slate-50 transition-colors"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-9 h-9 rounded-xl bg-amber-100 flex items-center justify-center text-amber-700 font-bold text-sm flex-shrink-0">
             {initials}
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="font-semibold text-slate-800 text-sm">👤 {member.name}</p>
-            <p className="text-xs text-slate-400">{member.assignments.length} objective dipilih</p>
+            <p className="text-xs text-slate-400">{member.assignments.length} objective · {open ? "klik untuk tutup" : "klik untuk buka"}</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
             objOk ? "bg-green-100 text-green-700"
             : totalWeight > 100 ? "bg-red-100 text-red-600"
@@ -287,8 +292,11 @@ function MemberCard({
           }`}>
             {totalWeight}%{objOk ? " ✅" : ""}
           </span>
+          <span className="text-slate-300">
+            {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+          </span>
           <button
-            onClick={() => onDelete(member.id)}
+            onClick={(e) => { e.stopPropagation(); onDelete(member.id); }}
             className="text-slate-300 hover:text-red-500 transition-colors p-1.5 rounded-lg hover:bg-red-50
               shadow-[0_3px_0_#e2e8f0] hover:shadow-[0_1px_0_#fecaca] hover:translate-y-0.5
               active:shadow-none active:translate-y-[3px] transition-all duration-75"
@@ -298,46 +306,50 @@ function MemberCard({
         </div>
       </div>
 
-      <div className="px-4 py-2 border-b border-slate-50">
-        <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-          <div
-            className={`h-1 rounded-full transition-all ${totalWeight > 100 ? "bg-red-400" : "bg-amber-400"}`}
-            style={{ width: `${Math.min(totalWeight, 100)}%` }}
-          />
-        </div>
-      </div>
+      {open && (
+        <>
+          <div className="px-4 py-2 border-t border-slate-100">
+            <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-1 rounded-full transition-all ${totalWeight > 100 ? "bg-red-400" : "bg-amber-400"}`}
+                style={{ width: `${Math.min(totalWeight, 100)}%` }}
+              />
+            </div>
+          </div>
 
-      <div className="p-3 space-y-2">
-        {member.assignments.map((a) => (
-          <AssignmentRow
-            key={a.id}
-            assignment={a}
-            objectives={objectives}
-            onRemove={(id) => onRemoveAssignment(id, member.id)}
-            onWeightChange={(id, val) => onWeightChange(id, member.id, val)}
-            onAddKR={(assignmentId, krId) => onAddKR(assignmentId, member.id, krId)}
-            onRemoveKR={(kraId, assignmentId) => onRemoveKR(kraId, assignmentId, member.id)}
-            onKRWeightChange={(kraId, assignmentId, val) => onKRWeightChange(kraId, assignmentId, member.id, val)}
-            onKRProgressChange={(kraId, assignmentId, val) => onKRProgressChange(kraId, assignmentId, member.id, val)}
-            onKRTargetChange={(kraId, assignmentId, val) => onKRTargetChange(kraId, assignmentId, member.id, val)}
-          />
-        ))}
+          <div className="p-3 space-y-2">
+            {member.assignments.map((a) => (
+              <AssignmentRow
+                key={a.id}
+                assignment={a}
+                objectives={objectives}
+                onRemove={(id) => onRemoveAssignment(id, member.id)}
+                onWeightChange={(id, val) => onWeightChange(id, member.id, val)}
+                onAddKR={(assignmentId, krId) => onAddKR(assignmentId, member.id, krId)}
+                onRemoveKR={(kraId, assignmentId) => onRemoveKR(kraId, assignmentId, member.id)}
+                onKRWeightChange={(kraId, assignmentId, val) => onKRWeightChange(kraId, assignmentId, member.id, val)}
+                onKRProgressChange={(kraId, assignmentId, val) => onKRProgressChange(kraId, assignmentId, member.id, val)}
+                onKRTargetChange={(kraId, assignmentId, val) => onKRTargetChange(kraId, assignmentId, member.id, val)}
+              />
+            ))}
 
-        {unassigned.length > 0 && (
-          <select
-            className="w-full border border-dashed border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-400 focus:outline-none focus:border-amber-400 bg-white cursor-pointer hover:border-amber-300 transition"
-            value=""
-            onChange={(e) => { if (e.target.value) onAddAssignment(member.id, e.target.value); }}
-          >
-            <option value="">➕ Tambah objective...</option>
-            {unassigned.map((o) => <option key={o.id} value={o.id}>{o.title}</option>)}
-          </select>
-        )}
+            {unassigned.length > 0 && (
+              <select
+                className="w-full border border-dashed border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-400 focus:outline-none focus:border-amber-400 bg-white cursor-pointer hover:border-amber-300 transition"
+                value=""
+                onChange={(e) => { if (e.target.value) onAddAssignment(member.id, e.target.value); }}
+              >
+                <option value="">➕ Tambah objective...</option>
+                {unassigned.map((o) => <option key={o.id} value={o.id}>{o.title}</option>)}
+              </select>
+            )}
 
-        {objectives.length === 0 && (
-          <p className="text-xs text-slate-400 text-center py-3">🎯 Buat objective dulu di atas.</p>
-        )}
-      </div>
+            {objectives.length === 0 && (
+              <p className="text-xs text-slate-400 text-center py-3">🎯 Buat objective dulu di atas.</p>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
