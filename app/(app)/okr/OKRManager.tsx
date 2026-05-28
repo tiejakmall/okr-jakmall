@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Trash2, ChevronDown, ChevronUp, CheckSquare, Square, X } from "lucide-react";
 import { calcObjectiveAchievement, calcKRAchievement } from "@/lib/calculations";
 
 type KeyResult = {
@@ -24,15 +24,21 @@ type Objective = {
   keyResults: KeyResult[];
 };
 
+type Quarter = {
+  id: string;
+  name: string;
+  year: number;
+  quarter: number;
+};
+
 type Props = {
   initialObjectives: Objective[];
   quarterId: string;
   userId: string;
+  allQuarters: Quarter[];
 };
 
 const UNITS = ["%", "pcs", "x", "score", "hari", "bulan", "orang", "lainnya"];
-
-// ─── Button helpers ───────────────────────────────────────────────────────────
 
 const btnPrimary =
   "flex items-center gap-2 bg-amber-400 text-gray-900 font-bold text-sm px-4 py-2 rounded-xl " +
@@ -98,18 +104,243 @@ function WeightBar({ objectives }: { objectives: Objective[] }) {
   );
 }
 
+// ─── Import Modal ─────────────────────────────────────────────────────────────
+
+function ImportModal({
+  currentQuarterId,
+  allQuarters,
+  onImport,
+  onClose,
+}: {
+  currentQuarterId: string;
+  allQuarters: Quarter[];
+  onImport: (newObjs: Objective[]) => void;
+  onClose: () => void;
+}) {
+  const otherQuarters = allQuarters.filter((q) => q.id !== currentQuarterId);
+  const [sourceId, setSourceId] = useState(otherQuarters[0]?.id ?? "");
+  const [sourceObjs, setSourceObjs] = useState<Objective[]>([]);
+  const [loadingObjs, setLoadingObjs] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [importing, setImporting] = useState(false);
+
+  async function loadObjectives(qId: string) {
+    setSourceId(qId);
+    setSelectedIds(new Set());
+    if (!qId) { setSourceObjs([]); return; }
+    setLoadingObjs(true);
+    const res = await fetch(`/api/objectives?quarterId=${qId}`);
+    if (res.ok) {
+      const data = await res.json();
+      setSourceObjs(data);
+      // Select all by default
+      setSelectedIds(new Set(data.map((o: Objective) => o.id)));
+    }
+    setLoadingObjs(false);
+  }
+
+  async function doImport() {
+    if (selectedIds.size === 0) return;
+    setImporting(true);
+    const res = await fetch("/api/okr/copy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fromQuarterId: sourceId,
+        toQuarterId: currentQuarterId,
+        objectiveIds: [...selectedIds],
+      }),
+    });
+    if (res.ok) {
+      const newObjs = await res.json();
+      onImport(newObjs);
+      onClose();
+    } else {
+      const err = await res.json();
+      alert(err.error ?? "Gagal mengimpor OKR");
+    }
+    setImporting(false);
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (selectedIds.size === sourceObjs.length) setSelectedIds(new Set());
+    else setSelectedIds(new Set(sourceObjs.map((o) => o.id)));
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <h3 className="font-bold text-slate-800">📋 Import OKR dari Quarter Lain</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition">
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {otherQuarters.length === 0 ? (
+            <p className="text-slate-500 text-sm text-center py-8">
+              Tidak ada quarter lain yang tersedia.
+            </p>
+          ) : (
+            <>
+              {/* Quarter picker */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Pilih Quarter Sumber</label>
+                <select
+                  value={sourceId}
+                  onChange={(e) => loadObjectives(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                >
+                  <option value="">-- Pilih Quarter --</option>
+                  {otherQuarters.map((q) => (
+                    <option key={q.id} value={q.id}>{q.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Objectives list */}
+              {loadingObjs && (
+                <p className="text-slate-400 text-sm text-center py-4">⏳ Memuat objective...</p>
+              )}
+
+              {!loadingObjs && sourceId && sourceObjs.length === 0 && (
+                <p className="text-slate-400 text-sm text-center py-4">
+                  Tidak ada objective di quarter ini.
+                </p>
+              )}
+
+              {!loadingObjs && sourceObjs.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-semibold text-slate-500">
+                      Pilih Objective yang akan diimpor ({selectedIds.size}/{sourceObjs.length})
+                    </label>
+                    <button
+                      onClick={toggleAll}
+                      className="text-xs text-amber-600 font-bold hover:text-amber-700"
+                    >
+                      {selectedIds.size === sourceObjs.length ? "Batal semua" : "Pilih semua"}
+                    </button>
+                  </div>
+                  <div className="space-y-2">
+                    {sourceObjs.map((obj) => (
+                      <button
+                        key={obj.id}
+                        onClick={() => toggleSelect(obj.id)}
+                        className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-colors ${
+                          selectedIds.has(obj.id)
+                            ? "border-amber-300 bg-amber-50"
+                            : "border-slate-200 bg-white hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="mt-0.5 flex-shrink-0">
+                          {selectedIds.has(obj.id)
+                            ? <CheckSquare size={16} className="text-amber-500" />
+                            : <Square size={16} className="text-slate-300" />
+                          }
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-700 truncate">{obj.title}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {obj.keyResults.length} key result · bobot {obj.weight}%
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-3">
+                    💡 Objective akan diimpor sebagai DRAFT. Progress direset ke 0.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100">
+          <button onClick={onClose} className={btnSecondary}>Batal</button>
+          <button
+            onClick={doImport}
+            disabled={importing || selectedIds.size === 0}
+            className={btnPrimary}
+          >
+            {importing ? "⏳ Mengimpor..." : `📥 Import (${selectedIds.size})`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function OKRManager({ initialObjectives, quarterId, userId }: Props) {
+export default function OKRManager({ initialObjectives, quarterId, userId, allQuarters }: Props) {
   const router = useRouter();
   const [objectives, setObjectives] = useState<Objective[]>(initialObjectives);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
 
+  // Bulk delete state
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+
+  // Import modal
+  const [showImport, setShowImport] = useState(false);
+
   const allSubmitted = objectives.length > 0 && objectives.every((o) => o.status === "SUBMITTED");
   const someSubmitted = objectives.some((o) => o.status === "SUBMITTED");
   const totalWeight = objectives.reduce((s, o) => s + Number(o.weight), 0);
   const weightOk = Math.abs(totalWeight - 100) <= 0.01;
+
+  // ── Select mode helpers ──────────────────────────────────────────────────────
+
+  function toggleSelectMode() {
+    setSelectMode((v) => !v);
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    const draftIds = objectives.filter((o) => o.status === "DRAFT").map((o) => o.id);
+    setSelectedIds(new Set(draftIds));
+  }
+
+  async function bulkDelete() {
+    if (selectedIds.size === 0) return;
+    if (!confirm(`Hapus ${selectedIds.size} objective beserta semua key result-nya?`)) return;
+    setBulkDeleting(true);
+    await Promise.all(
+      [...selectedIds].map((id) => fetch(`/api/objectives/${id}`, { method: "DELETE" }))
+    );
+    setObjectives((prev) => prev.filter((o) => !selectedIds.has(o.id)));
+    setSelectedIds(new Set());
+    setSelectMode(false);
+    setBulkDeleting(false);
+  }
+
+  // ── CRUD ────────────────────────────────────────────────────────────────────
 
   async function addObjective() {
     const res = await fetch("/api/objectives", {
@@ -205,248 +436,323 @@ export default function OKRManager({ initialObjectives, quarterId, userId }: Pro
     setObjectives((prev) => prev.map((o) => o.id === objectiveId ? { ...o, keyResults: o.keyResults.filter((kr) => kr.id !== krId) } : o));
   }
 
+  const draftObjectives = objectives.filter((o) => o.status === "DRAFT");
+
   return (
-    <div className="space-y-4">
-      <WeightBar objectives={objectives} />
-
-      {/* Status banners */}
-      {allSubmitted ? (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-start gap-3">
-          <span className="text-lg">✅</span>
-          <div>
-            <p className="font-semibold text-green-700 text-sm">OKR sudah dikumpulkan!</p>
-            <p className="text-green-600 text-xs mt-0.5">Progress diisi oleh anggota di bagian Distribusi Anggota di bawah.</p>
-          </div>
-        </div>
-      ) : someSubmitted ? (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
-          <span className="text-lg">ℹ️</span>
-          <p className="text-blue-700 text-sm">Sebagian OKR sudah dikumpulkan. Selesaikan semua objective lalu kumpulkan.</p>
-        </div>
-      ) : null}
-
-      {/* Action bar */}
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-slate-400">{saving ? "⏳ Menyimpan..." : "💾 Tersimpan otomatis"}</p>
-        <div className="flex gap-2">
-          {!allSubmitted && (
-            <button onClick={addObjective} className={btnSecondary}>
-              ➕ Tambah Objective
-            </button>
-          )}
-          {objectives.length > 0 && !allSubmitted && (
-            <button onClick={submitAllOKR} disabled={saving || !weightOk} className={btnPrimary}>
-              📤 Kumpulkan OKR
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Empty */}
-      {objectives.length === 0 && (
-        <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
-          <div className="text-4xl mb-3">🎯</div>
-          <p className="text-slate-500 text-sm">Belum ada objective. Klik "Tambah Objective" untuk mulai.</p>
-        </div>
+    <>
+      {showImport && (
+        <ImportModal
+          currentQuarterId={quarterId}
+          allQuarters={allQuarters}
+          onImport={(newObjs) => {
+            setObjectives((prev) => [...prev, ...newObjs]);
+            newObjs.forEach((o) => setExpanded((p) => ({ ...p, [o.id]: true })));
+          }}
+          onClose={() => setShowImport(false)}
+        />
       )}
 
-      {/* Objective cards */}
-      {objectives.map((obj) => {
-        const isLocked = obj.status === "SUBMITTED";
-        const krTotalWeight = obj.keyResults.reduce((s, kr) => s + Number(kr.weight), 0);
-        const krWeightOk = Math.abs(krTotalWeight - 100) <= 0.01;
-        const isExpanded = expanded[obj.id] ?? false;
-        const achievement = calcObjectiveAchievement(obj);
+      <div className="space-y-4">
+        <WeightBar objectives={objectives} />
 
-        return (
-          <div
-            key={obj.id}
-            className={`bg-white rounded-2xl border shadow-sm overflow-hidden ${
-              isLocked ? "border-green-200" : "border-slate-200"
-            }`}
-          >
-            {/* Objective header */}
-            <div className="flex items-center gap-3 px-4 py-3.5">
-              <button
-                onClick={() => setExpanded((p) => ({ ...p, [obj.id]: !p[obj.id] }))}
-                className="text-slate-400 hover:text-slate-600 transition flex-shrink-0"
-              >
-                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-              </button>
+        {/* Status banners */}
+        {allSubmitted ? (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-start gap-3">
+            <span className="text-lg">✅</span>
+            <div>
+              <p className="font-semibold text-green-700 text-sm">OKR sudah dikumpulkan!</p>
+              <p className="text-green-600 text-xs mt-0.5">Progress diisi oleh anggota di bagian Distribusi Anggota di bawah.</p>
+            </div>
+          </div>
+        ) : someSubmitted ? (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3">
+            <span className="text-lg">ℹ️</span>
+            <p className="text-blue-700 text-sm">Sebagian OKR sudah dikumpulkan. Selesaikan semua objective lalu kumpulkan.</p>
+          </div>
+        ) : null}
 
-              <input
-                className="flex-1 font-semibold text-slate-800 text-sm border-b border-transparent hover:border-slate-200 focus:border-amber-400 focus:outline-none bg-transparent py-0.5 disabled:cursor-default disabled:text-slate-600"
-                value={obj.title}
-                disabled={isLocked}
-                onChange={(e) => updateObjective(obj.id, { title: e.target.value })}
-                onBlur={() => !isLocked && saveObjective(obj)}
-              />
+        {/* Action bar */}
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <p className="text-xs text-slate-400">{saving ? "⏳ Menyimpan..." : "💾 Tersimpan otomatis"}</p>
 
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <span className="text-xs text-slate-400">Bobot</span>
-                <input
-                  type="number"
-                  className="w-14 text-right border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-amber-400 disabled:bg-slate-50 disabled:cursor-default"
-                  value={obj.weight}
-                  disabled={isLocked}
-                  onChange={(e) => updateObjective(obj.id, { weight: Number(e.target.value) })}
-                  onBlur={() => !isLocked && saveObjective(obj)}
-                  min={0} max={100}
-                />
-                <span className="text-xs text-slate-400">%</span>
-              </div>
-
-              <span className={`text-xs font-bold px-2.5 py-1 rounded-lg flex-shrink-0 ${
-                achievement >= 100 ? "bg-green-100 text-green-700"
-                : achievement >= 70 ? "bg-amber-100 text-amber-700"
-                : "bg-red-100 text-red-600"
-              }`}>
-                {achievement >= 100 ? "🏆" : achievement >= 70 ? "🔥" : "📉"} {achievement.toFixed(0)}%
-              </span>
-
-              {isLocked ? (
-                <button
-                  onClick={() => recallOKR(obj.id)}
-                  className="text-slate-400 hover:text-orange-500 transition flex-shrink-0 text-base"
-                  title="Tarik kembali ke draft"
-                >
-                  🔄
-                </button>
+          <div className="flex gap-2 flex-wrap justify-end">
+            {/* Bulk delete controls */}
+            {!allSubmitted && draftObjectives.length > 0 && (
+              selectMode ? (
+                <>
+                  <button
+                    onClick={selectAll}
+                    className={btnSecondary}
+                  >
+                    ☑️ Pilih Semua ({draftObjectives.length})
+                  </button>
+                  <button
+                    onClick={bulkDelete}
+                    disabled={bulkDeleting || selectedIds.size === 0}
+                    className="flex items-center gap-2 bg-red-500 text-white font-bold text-sm px-4 py-2 rounded-xl shadow-[0_4px_0_#dc2626] hover:shadow-[0_2px_0_#dc2626] hover:translate-y-0.5 active:shadow-[0_1px_0_#dc2626] active:translate-y-[3px] disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 transition-all duration-75"
+                  >
+                    <Trash2 size={14} />
+                    {bulkDeleting ? "Menghapus..." : `Hapus (${selectedIds.size})`}
+                  </button>
+                  <button onClick={toggleSelectMode} className={btnSecondary}>
+                    <X size={14} /> Batal
+                  </button>
+                </>
               ) : (
-                <button onClick={() => deleteObjective(obj.id)} className={`${btnDanger} flex-shrink-0`}>
-                  <Trash2 size={15} />
+                <button onClick={toggleSelectMode} className={btnSecondary}>
+                  <CheckSquare size={14} /> Pilih
                 </button>
-              )}
-            </div>
+              )
+            )}
 
-            {/* Progress bar */}
-            <div className="px-4 pb-2">
-              <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-                <div
-                  className={`h-1 rounded-full transition-all ${
-                    achievement >= 100 ? "bg-green-500" : achievement >= 70 ? "bg-amber-400" : "bg-red-400"
-                  }`}
-                  style={{ width: `${Math.min(achievement, 100)}%` }}
-                />
-              </div>
-            </div>
+            {/* Import button */}
+            {!allSubmitted && allQuarters.length > 1 && (
+              <button onClick={() => setShowImport(true)} className={btnSecondary}>
+                📋 Import dari Quarter Lain
+              </button>
+            )}
 
-            {/* Key Results */}
-            {isExpanded && (
-              <div className="px-4 pb-4 pt-1">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-slate-500">🔑 Bobot KR: {krTotalWeight}%</span>
-                    {obj.keyResults.length > 0 && (
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
-                        krWeightOk ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
-                      }`}>
-                        {krWeightOk ? "✅" : "harus 100%"}
-                      </span>
-                    )}
-                  </div>
-                  {!isLocked && (
-                    <button
-                      onClick={() => addKeyResult(obj.id)}
-                      className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 font-bold bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg
-                        shadow-[0_3px_0_#d97706] hover:shadow-[0_1px_0_#d97706] hover:translate-y-0.5
-                        active:shadow-none active:translate-y-[3px] transition-all duration-75"
-                    >
-                      ➕ Tambah KR
-                    </button>
-                  )}
-                </div>
+            {/* Add objective */}
+            {!allSubmitted && !selectMode && (
+              <button onClick={addObjective} className={btnSecondary}>
+                ➕ Tambah Objective
+              </button>
+            )}
 
-                {obj.keyResults.length === 0 && (
-                  <p className="text-slate-400 text-sm text-center py-6 border-2 border-dashed border-slate-100 rounded-xl">
-                    🔑 Belum ada key result.
-                  </p>
-                )}
-
-                <div className="space-y-2">
-                  {obj.keyResults.map((kr) => {
-                    const pct = calcKRAchievement(kr);
-                    return (
-                      <div key={kr.id} className="border border-slate-100 rounded-xl p-4 bg-slate-50/50">
-                        <div className="flex items-center gap-2 mb-3">
-                          <input
-                            className="flex-1 text-sm font-medium text-slate-800 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-amber-400 focus:outline-none disabled:cursor-default"
-                            value={kr.title}
-                            disabled={isLocked}
-                            onChange={(e) => updateKR(obj.id, kr.id, { title: e.target.value })}
-                            onBlur={() => !isLocked && saveKR(kr)}
-                            placeholder="Judul Key Result"
-                          />
-                          {!isLocked && (
-                            <button onClick={() => deleteKR(obj.id, kr.id)} className={`${btnDanger} flex-shrink-0`}>
-                              <Trash2 size={13} />
-                            </button>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-3 gap-3 text-xs mb-3">
-                          <div>
-                            <label className="block text-slate-400 mb-1 font-medium">🎯 Target</label>
-                            <input
-                              type="number"
-                              className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-amber-400 bg-white disabled:bg-slate-50 disabled:cursor-default"
-                              value={kr.target}
-                              disabled={isLocked}
-                              onChange={(e) => updateKR(obj.id, kr.id, { target: Number(e.target.value) })}
-                              onBlur={() => !isLocked && saveKR(kr)}
-                              min={0}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-slate-400 mb-1 font-medium">📏 Satuan</label>
-                            <select
-                              className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-amber-400 bg-white disabled:cursor-default"
-                              value={kr.unit}
-                              disabled={isLocked}
-                              onChange={(e) => updateKR(obj.id, kr.id, { unit: e.target.value })}
-                              onBlur={() => !isLocked && saveKR(kr)}
-                            >
-                              {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="block text-slate-400 mb-1 font-medium">⚖️ Bobot (%)</label>
-                            <input
-                              type="number"
-                              className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-amber-400 bg-white disabled:bg-slate-50 disabled:cursor-default"
-                              value={kr.weight}
-                              disabled={isLocked}
-                              onChange={(e) => updateKR(obj.id, kr.id, { weight: Number(e.target.value) })}
-                              onBlur={() => !isLocked && saveKR(kr)}
-                              min={0} max={100}
-                            />
-                          </div>
-                        </div>
-
-                        <p className="text-xs text-slate-400 italic mb-2">
-                          💡 Progress diisi oleh anggota di bagian Distribusi Anggota ↓
-                        </p>
-
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                            <div
-                              className={`h-1.5 rounded-full transition-all ${
-                                pct >= 100 ? "bg-green-500" : pct >= 70 ? "bg-amber-400" : "bg-red-400"
-                              }`}
-                              style={{ width: `${Math.min(pct, 100)}%` }}
-                            />
-                          </div>
-                          <span className="text-xs font-bold text-slate-500 w-10 text-right">{pct.toFixed(0)}%</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+            {/* Submit all */}
+            {objectives.length > 0 && !allSubmitted && !selectMode && (
+              <button onClick={submitAllOKR} disabled={saving || !weightOk} className={btnPrimary}>
+                📤 Kumpulkan OKR
+              </button>
             )}
           </div>
-        );
-      })}
-    </div>
+        </div>
+
+        {/* Empty */}
+        {objectives.length === 0 && (
+          <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
+            <div className="text-4xl mb-3">🎯</div>
+            <p className="text-slate-500 text-sm">Belum ada objective. Klik "Tambah Objective" atau import dari quarter sebelumnya.</p>
+          </div>
+        )}
+
+        {/* Objective cards */}
+        {objectives.map((obj) => {
+          const isLocked = obj.status === "SUBMITTED";
+          const isDraft = obj.status === "DRAFT";
+          const krTotalWeight = obj.keyResults.reduce((s, kr) => s + Number(kr.weight), 0);
+          const krWeightOk = Math.abs(krTotalWeight - 100) <= 0.01;
+          const isExpanded = expanded[obj.id] ?? false;
+          const achievement = calcObjectiveAchievement(obj);
+          const isSelected = selectedIds.has(obj.id);
+
+          return (
+            <div
+              key={obj.id}
+              className={`bg-white rounded-2xl border shadow-sm overflow-hidden transition-colors ${
+                isSelected ? "border-red-300 ring-2 ring-red-200"
+                : isLocked ? "border-green-200"
+                : "border-slate-200"
+              }`}
+            >
+              {/* Objective header */}
+              <div className="flex items-center gap-3 px-4 py-3.5">
+                {/* Checkbox in select mode (only for DRAFT) */}
+                {selectMode && isDraft && (
+                  <button
+                    onClick={() => toggleSelect(obj.id)}
+                    className="flex-shrink-0 text-slate-400 hover:text-amber-500 transition"
+                  >
+                    {isSelected
+                      ? <CheckSquare size={17} className="text-red-500" />
+                      : <Square size={17} />
+                    }
+                  </button>
+                )}
+
+                <button
+                  onClick={() => setExpanded((p) => ({ ...p, [obj.id]: !p[obj.id] }))}
+                  className="text-slate-400 hover:text-slate-600 transition flex-shrink-0"
+                >
+                  {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+
+                <input
+                  className="flex-1 font-semibold text-slate-800 text-sm border-b border-transparent hover:border-slate-200 focus:border-amber-400 focus:outline-none bg-transparent py-0.5 disabled:cursor-default disabled:text-slate-600"
+                  value={obj.title}
+                  disabled={isLocked}
+                  onChange={(e) => updateObjective(obj.id, { title: e.target.value })}
+                  onBlur={() => !isLocked && saveObjective(obj)}
+                />
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  <span className="text-xs text-slate-400">Bobot</span>
+                  <input
+                    type="number"
+                    className="w-14 text-right border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-amber-400 disabled:bg-slate-50 disabled:cursor-default"
+                    value={obj.weight}
+                    disabled={isLocked}
+                    onChange={(e) => updateObjective(obj.id, { weight: Number(e.target.value) })}
+                    onBlur={() => !isLocked && saveObjective(obj)}
+                    min={0} max={100}
+                  />
+                  <span className="text-xs text-slate-400">%</span>
+                </div>
+
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-lg flex-shrink-0 ${
+                  achievement >= 100 ? "bg-green-100 text-green-700"
+                  : achievement >= 70 ? "bg-amber-100 text-amber-700"
+                  : "bg-red-100 text-red-600"
+                }`}>
+                  {achievement >= 100 ? "🏆" : achievement >= 70 ? "🔥" : "📉"} {achievement.toFixed(0)}%
+                </span>
+
+                {isLocked ? (
+                  <button
+                    onClick={() => recallOKR(obj.id)}
+                    className="text-slate-400 hover:text-orange-500 transition flex-shrink-0 text-base"
+                    title="Tarik kembali ke draft"
+                  >
+                    🔄
+                  </button>
+                ) : (
+                  !selectMode && (
+                    <button onClick={() => deleteObjective(obj.id)} className={`${btnDanger} flex-shrink-0`}>
+                      <Trash2 size={15} />
+                    </button>
+                  )
+                )}
+              </div>
+
+              {/* Progress bar */}
+              <div className="px-4 pb-2">
+                <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-1 rounded-full transition-all ${
+                      achievement >= 100 ? "bg-green-500" : achievement >= 70 ? "bg-amber-400" : "bg-red-400"
+                    }`}
+                    style={{ width: `${Math.min(achievement, 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Key Results */}
+              {isExpanded && (
+                <div className="px-4 pb-4 pt-1">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-slate-500">🔑 Bobot KR: {krTotalWeight}%</span>
+                      {obj.keyResults.length > 0 && (
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-md ${
+                          krWeightOk ? "bg-green-100 text-green-700" : "bg-red-100 text-red-600"
+                        }`}>
+                          {krWeightOk ? "✅" : "harus 100%"}
+                        </span>
+                      )}
+                    </div>
+                    {!isLocked && (
+                      <button
+                        onClick={() => addKeyResult(obj.id)}
+                        className="flex items-center gap-1 text-xs text-amber-600 hover:text-amber-700 font-bold bg-amber-50 hover:bg-amber-100 px-3 py-1.5 rounded-lg
+                          shadow-[0_3px_0_#d97706] hover:shadow-[0_1px_0_#d97706] hover:translate-y-0.5
+                          active:shadow-none active:translate-y-[3px] transition-all duration-75"
+                      >
+                        ➕ Tambah KR
+                      </button>
+                    )}
+                  </div>
+
+                  {obj.keyResults.length === 0 && (
+                    <p className="text-slate-400 text-sm text-center py-6 border-2 border-dashed border-slate-100 rounded-xl">
+                      🔑 Belum ada key result.
+                    </p>
+                  )}
+
+                  <div className="space-y-2">
+                    {obj.keyResults.map((kr) => {
+                      const pct = calcKRAchievement(kr);
+                      return (
+                        <div key={kr.id} className="border border-slate-100 rounded-xl p-4 bg-slate-50/50">
+                          <div className="flex items-center gap-2 mb-3">
+                            <input
+                              className="flex-1 text-sm font-medium text-slate-800 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-amber-400 focus:outline-none disabled:cursor-default"
+                              value={kr.title}
+                              disabled={isLocked}
+                              onChange={(e) => updateKR(obj.id, kr.id, { title: e.target.value })}
+                              onBlur={() => !isLocked && saveKR(kr)}
+                              placeholder="Judul Key Result"
+                            />
+                            {!isLocked && (
+                              <button onClick={() => deleteKR(obj.id, kr.id)} className={`${btnDanger} flex-shrink-0`}>
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="grid grid-cols-3 gap-3 text-xs mb-3">
+                            <div>
+                              <label className="block text-slate-400 mb-1 font-medium">🎯 Target</label>
+                              <input
+                                type="number"
+                                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-amber-400 bg-white disabled:bg-slate-50 disabled:cursor-default"
+                                value={kr.target}
+                                disabled={isLocked}
+                                onChange={(e) => updateKR(obj.id, kr.id, { target: Number(e.target.value) })}
+                                onBlur={() => !isLocked && saveKR(kr)}
+                                min={0}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-slate-400 mb-1 font-medium">📏 Satuan</label>
+                              <select
+                                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-amber-400 bg-white disabled:cursor-default"
+                                value={kr.unit}
+                                disabled={isLocked}
+                                onChange={(e) => updateKR(obj.id, kr.id, { unit: e.target.value })}
+                                onBlur={() => !isLocked && saveKR(kr)}
+                              >
+                                {UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="block text-slate-400 mb-1 font-medium">⚖️ Bobot (%)</label>
+                              <input
+                                type="number"
+                                className="w-full border border-slate-200 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:border-amber-400 bg-white disabled:bg-slate-50 disabled:cursor-default"
+                                value={kr.weight}
+                                disabled={isLocked}
+                                onChange={(e) => updateKR(obj.id, kr.id, { weight: Number(e.target.value) })}
+                                onBlur={() => !isLocked && saveKR(kr)}
+                                min={0} max={100}
+                              />
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-slate-400 italic mb-2">
+                            💡 Progress diisi oleh anggota di bagian Distribusi Anggota ↓
+                          </p>
+
+                          <div className="flex items-center gap-3">
+                            <div className="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                              <div
+                                className={`h-1.5 rounded-full transition-all ${
+                                  pct >= 100 ? "bg-green-500" : pct >= 70 ? "bg-amber-400" : "bg-red-400"
+                                }`}
+                                style={{ width: `${Math.min(pct, 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-bold text-slate-500 w-10 text-right">{pct.toFixed(0)}%</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </>
   );
 }

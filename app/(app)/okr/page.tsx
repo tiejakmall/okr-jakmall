@@ -3,27 +3,53 @@ import { prisma } from "@/lib/prisma";
 import OKRManager from "./OKRManager";
 import DistribusiAnggota from "./DistribusiAnggota";
 import ImportExportSection from "./ImportExportSection";
+import QuarterSelector from "./QuarterSelector";
 
-export default async function OKRPage() {
+export default async function OKRPage({ searchParams }: { searchParams: Promise<{ quarterId?: string }> }) {
   const session = await auth();
   const isLead = session!.user.role === "LEAD" || session!.user.role === "ADMIN";
-  const activeQuarter = await prisma.quarter.findFirst({ where: { isActive: true } });
 
-  if (!activeQuarter) {
+  const { quarterId: selectedId } = await searchParams;
+
+  const quarters = await prisma.quarter.findMany({
+    orderBy: [{ year: "desc" }, { quarter: "desc" }],
+  });
+
+  // Determine active quarter: prefer URL param → active → most recent
+  const selectedQuarter = selectedId
+    ? quarters.find((q) => q.id === selectedId)
+    : quarters.find((q) => q.isActive) ?? quarters[0];
+
+  if (quarters.length === 0) {
     return (
       <div>
         <h1 className="text-xl font-bold text-slate-900 mb-4">
           {isLead ? "OKR Divisi" : "OKR Saya"}
         </h1>
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-amber-700 text-sm">
-          Belum ada quarter aktif. Tunggu Admin mengaktifkan quarter.
+        {isLead ? (
+          <QuarterSelector quarters={[]} selectedQuarterId={null} isLead={isLead} />
+        ) : (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-amber-700 text-sm">
+            Belum ada quarter. Tunggu Lead atau Admin membuat quarter terlebih dahulu.
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (!selectedQuarter) {
+    return (
+      <div>
+        <QuarterSelector quarters={JSON.parse(JSON.stringify(quarters))} selectedQuarterId={null} isLead={isLead} />
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-amber-700 text-sm mt-4">
+          Pilih quarter di atas untuk melihat OKR.
         </div>
       </div>
     );
   }
 
   const objectives = await prisma.objective.findMany({
-    where: { userId: session!.user.id, quarterId: activeQuarter.id },
+    where: { userId: session!.user.id, quarterId: selectedQuarter.id },
     include: { keyResults: true },
     orderBy: { createdAt: "asc" },
   });
@@ -51,6 +77,13 @@ export default async function OKRPage() {
 
   return (
     <div className="space-y-8">
+      {/* Quarter selector */}
+      <QuarterSelector
+        quarters={JSON.parse(JSON.stringify(quarters))}
+        selectedQuarterId={selectedQuarter.id}
+        isLead={isLead}
+      />
+
       {/* Bagian 1: OKR */}
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -58,18 +91,19 @@ export default async function OKRPage() {
             <h1 className="text-xl font-bold text-slate-900">
               {isLead ? "OKR Divisi" : "OKR Saya"}
             </h1>
-            <p className="text-slate-500 text-sm">{activeQuarter.name}</p>
+            <p className="text-slate-500 text-sm">{selectedQuarter.name}</p>
           </div>
         </div>
         <OKRManager
           initialObjectives={JSON.parse(JSON.stringify(objectives))}
-          quarterId={activeQuarter.id}
+          quarterId={selectedQuarter.id}
           userId={session!.user.id}
+          allQuarters={JSON.parse(JSON.stringify(quarters))}
         />
       </div>
 
       {/* Import / Export */}
-      <ImportExportSection quarterId={activeQuarter.id} />
+      <ImportExportSection quarterId={selectedQuarter.id} />
 
       {/* Bagian 2: Distribusi ke anggota (Lead/Admin only) */}
       {isLead && (
