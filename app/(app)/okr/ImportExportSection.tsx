@@ -87,16 +87,7 @@ export default function ImportExportSection({ quarterId }: Props) {
   const btnViolet = btnBase + "bg-violet-100 text-violet-700 border border-violet-200 shadow-[0_4px_0_#ddd6fe] hover:shadow-[0_2px_0_#ddd6fe] hover:translate-y-0.5 active:shadow-[0_1px_0_#ddd6fe] active:translate-y-[3px]";
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-      <div className="px-5 py-4 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
-        <span className="text-base">📥</span>
-        <div>
-          <h2 className="font-bold text-slate-800 text-sm">Import / Export Excel</h2>
-          <p className="text-xs text-slate-400 mt-0.5">Download template → isi → upload. Atau ekspor data OKR ke Excel.</p>
-        </div>
-      </div>
-
-      <div className="p-5 space-y-4">
+    <div className="space-y-4">
         <div className="flex flex-wrap items-center gap-3">
           <button onClick={handleTemplate} className={btnSlate}>📋 Download Template</button>
 
@@ -129,6 +120,7 @@ export default function ImportExportSection({ quarterId }: Props) {
 
         {/* Preview panel */}
         {preview && (
+
           <div className="border border-violet-200 rounded-xl overflow-hidden">
             <div className="bg-violet-50 px-4 py-2.5 flex items-center justify-between">
               <div>
@@ -185,7 +177,6 @@ export default function ImportExportSection({ quarterId }: Props) {
             <li>Kolom C (Key Result) harus terisi di setiap baris</li>
           </ul>
         </div>
-      </div>
     </div>
   );
 }

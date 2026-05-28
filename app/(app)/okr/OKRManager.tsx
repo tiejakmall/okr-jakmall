@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Trash2, ChevronDown, ChevronUp, CheckSquare, Square, X } from "lucide-react";
+import { Trash2, ChevronDown, ChevronUp, CheckSquare, Square, X, Key } from "lucide-react";
 import { calcObjectiveAchievement, calcKRAchievement } from "@/lib/calculations";
 
 type KeyResult = {
@@ -106,6 +106,8 @@ function WeightBar({ objectives }: { objectives: Objective[] }) {
 
 // ─── Import Modal ─────────────────────────────────────────────────────────────
 
+type KRSelection = Record<string, Set<string>>; // objectiveId → selected KR ids
+
 function ImportModal({
   currentQuarterId,
   allQuarters,
@@ -121,169 +123,186 @@ function ImportModal({
   const [sourceId, setSourceId] = useState(otherQuarters[0]?.id ?? "");
   const [sourceObjs, setSourceObjs] = useState<Objective[]>([]);
   const [loadingObjs, setLoadingObjs] = useState(false);
+  const [selectedKRs, setSelectedKRs] = useState<KRSelection>({});
+  const [expandedObjs, setExpandedObjs] = useState<Set<string>>(new Set());
+  const [importing, setImporting] = useState(false);
 
-  // Auto-load objectives for the first quarter when modal opens
+  // Auto-load objectives when modal first opens
   useEffect(() => {
     if (sourceId) loadObjectives(sourceId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [importing, setImporting] = useState(false);
 
   async function loadObjectives(qId: string) {
     setSourceId(qId);
-    setSelectedIds(new Set());
+    setSelectedKRs({});
+    setExpandedObjs(new Set());
     if (!qId) { setSourceObjs([]); return; }
     setLoadingObjs(true);
     const res = await fetch(`/api/objectives?quarterId=${qId}`);
     if (res.ok) {
-      const data = await res.json();
+      const data: Objective[] = await res.json();
       setSourceObjs(data);
-      // Select all by default
-      setSelectedIds(new Set(data.map((o: Objective) => o.id)));
+      // Select all objectives + all KRs by default
+      const init: KRSelection = {};
+      data.forEach((obj) => { init[obj.id] = new Set(obj.keyResults.map((kr) => kr.id)); });
+      setSelectedKRs(init);
     }
     setLoadingObjs(false);
   }
 
-  async function doImport() {
-    if (selectedIds.size === 0) return;
-    setImporting(true);
-    const res = await fetch("/api/okr/copy", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fromQuarterId: sourceId,
-        toQuarterId: currentQuarterId,
-        objectiveIds: [...selectedIds],
-      }),
-    });
-    if (res.ok) {
-      const newObjs = await res.json();
-      onImport(newObjs);
-      onClose();
-    } else {
-      const err = await res.json();
-      alert(err.error ?? "Gagal mengimpor OKR");
-    }
-    setImporting(false);
-  }
+  const isObjSelected = (id: string) => (selectedKRs[id]?.size ?? 0) > 0;
 
-  function toggleSelect(id: string) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+  function toggleObj(obj: Objective) {
+    setSelectedKRs((prev) => {
+      const next = { ...prev };
+      if (isObjSelected(obj.id)) { delete next[obj.id]; }
+      else { next[obj.id] = new Set(obj.keyResults.map((kr) => kr.id)); }
       return next;
     });
   }
 
-  function toggleAll() {
-    if (selectedIds.size === sourceObjs.length) setSelectedIds(new Set());
-    else setSelectedIds(new Set(sourceObjs.map((o) => o.id)));
+  function toggleKR(objId: string, krId: string) {
+    setSelectedKRs((prev) => {
+      const next = { ...prev };
+      const set = new Set(prev[objId] ?? []);
+      if (set.has(krId)) set.delete(krId); else set.add(krId);
+      if (set.size === 0) delete next[objId]; else next[objId] = set;
+      return next;
+    });
+  }
+
+  function toggleAllObjs() {
+    const anySelected = sourceObjs.some((o) => isObjSelected(o.id));
+    if (anySelected) { setSelectedKRs({}); }
+    else {
+      const init: KRSelection = {};
+      sourceObjs.forEach((obj) => { init[obj.id] = new Set(obj.keyResults.map((kr) => kr.id)); });
+      setSelectedKRs(init);
+    }
+  }
+
+  function toggleExpandObj(id: string) {
+    setExpandedObjs((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  const selectedObjCount = sourceObjs.filter((o) => isObjSelected(o.id)).length;
+  const selectedKRCount = Object.values(selectedKRs).reduce((s, set) => s + set.size, 0);
+
+  async function doImport() {
+    if (selectedObjCount === 0) return;
+    setImporting(true);
+    const selections = sourceObjs
+      .filter((o) => isObjSelected(o.id))
+      .map((o) => ({ objectiveId: o.id, keyResultIds: [...(selectedKRs[o.id] ?? [])] }));
+    const res = await fetch("/api/okr/copy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fromQuarterId: sourceId, toQuarterId: currentQuarterId, selections }),
+    });
+    if (res.ok) { onImport(await res.json()); onClose(); }
+    else { alert((await res.json()).error ?? "Gagal mengimpor OKR"); }
+    setImporting(false);
   }
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
-        {/* Header */}
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <h3 className="font-bold text-slate-800">📋 Import OKR dari Quarter Lain</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition">
-            <X size={18} />
-          </button>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition"><X size={18} /></button>
         </div>
 
-        {/* Body */}
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
           {otherQuarters.length === 0 ? (
-            <p className="text-slate-500 text-sm text-center py-8">
-              Tidak ada quarter lain yang tersedia.
-            </p>
+            <p className="text-slate-500 text-sm text-center py-8">Tidak ada quarter lain yang tersedia.</p>
           ) : (
             <>
-              {/* Quarter picker */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1.5">Pilih Quarter Sumber</label>
-                <select
-                  value={sourceId}
-                  onChange={(e) => loadObjectives(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
-                >
+                <select value={sourceId} onChange={(e) => loadObjectives(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white">
                   <option value="">-- Pilih Quarter --</option>
-                  {otherQuarters.map((q) => (
-                    <option key={q.id} value={q.id}>{q.name}</option>
-                  ))}
+                  {otherQuarters.map((q) => <option key={q.id} value={q.id}>{q.name}</option>)}
                 </select>
               </div>
 
-              {/* Objectives list */}
-              {loadingObjs && (
-                <p className="text-slate-400 text-sm text-center py-4">⏳ Memuat objective...</p>
-              )}
-
+              {loadingObjs && <p className="text-slate-400 text-sm text-center py-4">⏳ Memuat objective...</p>}
               {!loadingObjs && sourceId && sourceObjs.length === 0 && (
-                <p className="text-slate-400 text-sm text-center py-4">
-                  Tidak ada objective di quarter ini.
-                </p>
+                <p className="text-slate-400 text-sm text-center py-4">Tidak ada objective di quarter ini.</p>
               )}
 
               {!loadingObjs && sourceObjs.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-semibold text-slate-500">
-                      Pilih Objective yang akan diimpor ({selectedIds.size}/{sourceObjs.length})
-                    </label>
-                    <button
-                      onClick={toggleAll}
-                      className="text-xs text-amber-600 font-bold hover:text-amber-700"
-                    >
-                      {selectedIds.size === sourceObjs.length ? "Batal semua" : "Pilih semua"}
+                    <span className="text-xs font-semibold text-slate-500">
+                      {selectedObjCount} obj · {selectedKRCount} KR dipilih
+                    </span>
+                    <button onClick={toggleAllObjs} className="text-xs text-amber-600 font-bold hover:text-amber-700">
+                      {sourceObjs.some((o) => isObjSelected(o.id)) ? "Batal semua" : "Pilih semua"}
                     </button>
                   </div>
+
                   <div className="space-y-2">
-                    {sourceObjs.map((obj) => (
-                      <button
-                        key={obj.id}
-                        onClick={() => toggleSelect(obj.id)}
-                        className={`w-full flex items-start gap-3 p-3 rounded-xl border text-left transition-colors ${
-                          selectedIds.has(obj.id)
-                            ? "border-amber-300 bg-amber-50"
-                            : "border-slate-200 bg-white hover:bg-slate-50"
-                        }`}
-                      >
-                        <span className="mt-0.5 flex-shrink-0">
-                          {selectedIds.has(obj.id)
-                            ? <CheckSquare size={16} className="text-amber-500" />
-                            : <Square size={16} className="text-slate-300" />
-                          }
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-slate-700 truncate">{obj.title}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">
-                            {obj.keyResults.length} key result · bobot {obj.weight}%
-                          </p>
+                    {sourceObjs.map((obj) => {
+                      const objSel = isObjSelected(obj.id);
+                      const expanded = expandedObjs.has(obj.id);
+                      const krCount = selectedKRs[obj.id]?.size ?? 0;
+                      return (
+                        <div key={obj.id} className={`rounded-xl border transition-colors ${objSel ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}>
+                          <div className="flex items-center gap-2 p-3">
+                            <button onClick={() => toggleObj(obj)} className="flex-shrink-0">
+                              {objSel ? <CheckSquare size={16} className="text-amber-500" /> : <Square size={16} className="text-slate-300" />}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-slate-700 truncate">{obj.title}</p>
+                              <p className="text-xs text-slate-400 mt-0.5">
+                                bobot {obj.weight}% · <span className={krCount > 0 ? "text-amber-600 font-medium" : ""}>{krCount}/{obj.keyResults.length} KR</span>
+                              </p>
+                            </div>
+                            {obj.keyResults.length > 0 && (
+                              <button onClick={() => toggleExpandObj(obj.id)}
+                                className="flex-shrink-0 flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100 transition">
+                                <Key size={11} />
+                                {expanded ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                              </button>
+                            )}
+                          </div>
+
+                          {expanded && obj.keyResults.length > 0 && (
+                            <div className="border-t border-slate-100 px-3 pb-3 pt-2 space-y-1.5">
+                              {obj.keyResults.map((kr) => {
+                                const krSel = selectedKRs[obj.id]?.has(kr.id) ?? false;
+                                return (
+                                  <button key={kr.id} onClick={() => toggleKR(obj.id, kr.id)}
+                                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors ${krSel ? "bg-amber-100 border border-amber-200" : "bg-white border border-slate-100 hover:bg-slate-50"}`}>
+                                    {krSel ? <CheckSquare size={13} className="text-amber-500 flex-shrink-0" /> : <Square size={13} className="text-slate-300 flex-shrink-0" />}
+                                    <span className="text-xs text-slate-700 truncate flex-1">{kr.title}</span>
+                                    <span className="text-xs text-slate-400 flex-shrink-0">{kr.target} {kr.unit}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
-                      </button>
-                    ))}
+                      );
+                    })}
                   </div>
-                  <p className="text-xs text-slate-400 mt-3">
-                    💡 Objective akan diimpor sebagai DRAFT. Progress direset ke 0.
-                  </p>
+                  <p className="text-xs text-slate-400 mt-3">💡 Objective diimpor sebagai DRAFT. Progress direset ke 0. Klik 🔑 untuk pilih KR spesifik.</p>
                 </div>
               )}
             </>
           )}
         </div>
 
-        {/* Footer */}
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100">
           <button onClick={onClose} className={btnSecondary}>Batal</button>
-          <button
-            onClick={doImport}
-            disabled={importing || selectedIds.size === 0}
-            className={btnPrimary}
-          >
-            {importing ? "⏳ Mengimpor..." : `📥 Import (${selectedIds.size})`}
+          <button onClick={doImport} disabled={importing || selectedObjCount === 0} className={btnPrimary}>
+            {importing ? "⏳ Mengimpor..." : `📥 Import ${selectedObjCount > 0 ? `(${selectedObjCount} obj, ${selectedKRCount} KR)` : ""}`}
           </button>
         </div>
       </div>
