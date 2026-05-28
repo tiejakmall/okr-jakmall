@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import OKRManager from "./OKRManager";
 import DistribusiAnggota from "./DistribusiAnggota";
+import ImportExportSection from "./ImportExportSection";
 
 export default async function OKRPage() {
   const session = await auth();
@@ -11,10 +12,10 @@ export default async function OKRPage() {
   if (!activeQuarter) {
     return (
       <div>
-        <h1 className="text-2xl font-bold text-gray-800 mb-4">
+        <h1 className="text-xl font-bold text-slate-900 mb-4">
           {isLead ? "OKR Divisi" : "OKR Saya"}
         </h1>
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 text-yellow-700">
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 text-amber-700 text-sm">
           Belum ada quarter aktif. Tunggu Admin mengaktifkan quarter.
         </div>
       </div>
@@ -34,7 +35,13 @@ export default async function OKRPage() {
           assignments: {
             include: {
               objective: { select: { id: true, title: true } },
-              krAssignments: true,
+              krAssignments: {
+                include: {
+                  keyResult: {
+                    select: { id: true, title: true, target: true, unit: true },
+                  },
+                },
+              },
             },
           },
         },
@@ -48,10 +55,10 @@ export default async function OKRPage() {
       <div>
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-800">
+            <h1 className="text-xl font-bold text-slate-900">
               {isLead ? "OKR Divisi" : "OKR Saya"}
             </h1>
-            <p className="text-gray-500 text-sm">{activeQuarter.name}</p>
+            <p className="text-slate-500 text-sm">{activeQuarter.name}</p>
           </div>
         </div>
         <OKRManager
@@ -61,12 +68,15 @@ export default async function OKRPage() {
         />
       </div>
 
+      {/* Import / Export */}
+      <ImportExportSection quarterId={activeQuarter.id} />
+
       {/* Bagian 2: Distribusi ke anggota (Lead/Admin only) */}
       {isLead && (
         <div>
           <div className="mb-4">
-            <h2 className="text-xl font-bold text-gray-800">Distribusi ke Anggota</h2>
-            <p className="text-gray-500 text-sm mt-0.5">
+            <h2 className="text-lg font-bold text-slate-900">Distribusi ke Anggota</h2>
+            <p className="text-slate-500 text-sm mt-0.5">
               Assign anggota ke objective + key result. Bobot objective harus 100%, bobot KR per objective harus 100%.
             </p>
           </div>

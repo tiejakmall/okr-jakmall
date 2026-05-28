@@ -13,7 +13,7 @@ export default async function QuartersPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Manajemen Quarter</h1>
+      <h1 className="text-xl font-bold text-slate-900 mb-6">Manajemen Quarter</h1>
       <QuarterManager initialQuarters={JSON.parse(JSON.stringify(quarters))} />
     </div>
   );

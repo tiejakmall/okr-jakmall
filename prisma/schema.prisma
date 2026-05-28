@@ -86,6 +86,7 @@ model KRAssignment {
   id           String              @id @default(cuid())
   weight       Float               @default(0)
   progress     Float               @default(0)
+  target       Float?              // Individual target override (null = use parent KR target)
   assignmentId String
   assignment   ObjectiveAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   keyResultId  String

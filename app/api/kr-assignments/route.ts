@@ -13,6 +13,7 @@ export async function POST(req: NextRequest) {
       keyResultId: body.keyResultId,
       weight: Number(body.weight ?? 0),
       progress: Number(body.progress ?? 0),
+      target: body.target !== undefined && body.target !== null ? Number(body.target) : null,
     },
   });
   return NextResponse.json(kra, { status: 201 });

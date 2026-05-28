@@ -19,6 +19,7 @@ type KRAssignment = {
   keyResultId: string;
   weight: number;
   progress: number;
+  target?: number | null; // individual target override
 };
 
 type Assignment = {
@@ -73,8 +74,9 @@ function calcObjectiveAchievementForMember(obj: ObjWithKRs, krAssignments: KRAss
   return krAssignments.reduce((s: number, kra: KRAssignment) => {
     const kr = obj.keyResults.find((k) => k.id === kra.keyResultId);
     if (!kr) return s;
-    // Per member, use their own progress for this KR
-    const memberKR: KR = { ...kr, teamProgress: kra.progress, leadProgress: null };
+    // Per member, use their own progress + optional individual target
+    const effectiveTarget = (kra.target != null && kra.target > 0) ? kra.target : kr.target;
+    const memberKR: KR = { ...kr, target: effectiveTarget, teamProgress: kra.progress, leadProgress: null };
     return s + (calcKRAchievement(memberKR) * kra.weight) / totalWeight;
   }, 0);
 }
