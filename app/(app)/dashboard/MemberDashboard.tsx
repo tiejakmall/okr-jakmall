@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { calcObjectiveAchievement, calcUserAchievement } from "@/lib/calculations";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from "recharts";
 
@@ -30,6 +31,87 @@ function ProgressBar({ value, size = "sm" }: { value: number; size?: "xs" | "sm"
   return (
     <div className={`${h} bg-slate-100 rounded-full overflow-hidden`}>
       <div className={`${h} ${bg} rounded-full transition-all`} style={{ width: `${Math.min(value, 100)}%` }} />
+    </div>
+  );
+}
+
+function ObjectiveCard({ obj, oa, index }: { obj: Objective; oa: number; index: number }) {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-5 py-4 bg-slate-50 hover:bg-slate-100 transition-colors text-left group"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-lg flex-shrink-0">🎯</span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-amber-600 mb-0.5">Objective #{index + 1}</p>
+            <h3 className="font-bold text-slate-800 text-sm leading-snug">{obj.title}</h3>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs text-slate-400">⚖️ Bobot {obj.weight}%</span>
+              {obj.status === "SUBMITTED"
+                ? <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">✅ Terkumpul</span>
+                : <span className="bg-slate-100 text-slate-500 text-xs font-semibold px-2 py-0.5 rounded-full">📝 Draft</span>
+              }
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+          <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${achClass(oa)}`}>
+            {achEmoji(oa)} {oa.toFixed(1)}%
+          </span>
+          <span className="text-slate-300 group-hover:text-slate-500 transition-colors">
+            {open ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          </span>
+        </div>
+      </button>
+
+      {open && (
+        <>
+          <div className="px-5 py-2 border-t border-slate-100">
+            <ProgressBar value={oa} size="xs" />
+          </div>
+          <div className="p-5">
+            <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">🔑 Key Results</p>
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b border-slate-100">
+                  <th className="text-left py-2 pr-3 text-xs font-semibold text-slate-400">Key Result</th>
+                  <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Target</th>
+                  <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Satuan</th>
+                  <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Bobot</th>
+                  <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Progress</th>
+                  <th className="text-right py-2 pl-2 text-xs font-semibold text-slate-400">Pencapaian</th>
+                </tr>
+              </thead>
+              <tbody>
+                {obj.keyResults.map((kr) => {
+                  const progress = kr.leadProgress ?? kr.teamProgress;
+                  const pct = kr.target > 0 ? Math.min((progress / kr.target) * 100, 100) : 0;
+                  return (
+                    <tr key={kr.id} className="border-b border-slate-50 last:border-0">
+                      <td className="py-2.5 pr-3 font-medium text-slate-700">
+                        <span className="block">{kr.title}</span>
+                        {kr.leadProgress !== null && <span className="text-xs text-blue-500">🔒 lead</span>}
+                      </td>
+                      <td className="py-2.5 px-2 text-right text-slate-600 tabular-nums">{kr.target}</td>
+                      <td className="py-2.5 px-2 text-right text-slate-400">{kr.unit}</td>
+                      <td className="py-2.5 px-2 text-right font-semibold text-slate-600">{kr.weight}%</td>
+                      <td className="py-2.5 px-2 text-right tabular-nums text-slate-700">{progress} / {kr.target}</td>
+                      <td className="py-2.5 pl-2 text-right">
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${achClass(pct)}`}>
+                          {pct.toFixed(0)}%
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -141,73 +223,9 @@ export default function MemberDashboard({ quarters, userId, initialObjectives, i
       {/* Objectives */}
       {!loading && objectives.length > 0 && (
         <div className="space-y-4">
-          {objectives.map((obj) => {
+          {objectives.map((obj, idx) => {
             const oa = calcObjectiveAchievement(obj as Parameters<typeof calcObjectiveAchievement>[0]);
-            return (
-              <div key={obj.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-lg">🎯</span>
-                    <div className="min-w-0">
-                      <h3 className="font-bold text-slate-800 text-sm truncate">{obj.title}</h3>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-slate-400">⚖️ Bobot {obj.weight}%</span>
-                        {obj.status === "SUBMITTED"
-                          ? <span className="bg-green-100 text-green-700 text-xs font-semibold px-2 py-0.5 rounded-full">✅ Terkumpul</span>
-                          : <span className="bg-slate-100 text-slate-500 text-xs font-semibold px-2 py-0.5 rounded-full">📝 Draft</span>
-                        }
-                      </div>
-                    </div>
-                  </div>
-                  <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${achClass(oa)}`}>
-                    {achEmoji(oa)} {oa.toFixed(1)}%
-                  </span>
-                </div>
-
-                <div className="px-5 py-2 border-b border-slate-100">
-                  <ProgressBar value={oa} size="xs" />
-                </div>
-
-                <div className="p-5">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">🔑 Key Results</p>
-                  <table className="w-full text-sm border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-100">
-                        <th className="text-left py-2 pr-3 text-xs font-semibold text-slate-400">Key Result</th>
-                        <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Target</th>
-                        <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Satuan</th>
-                        <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Bobot</th>
-                        <th className="text-right py-2 px-2 text-xs font-semibold text-slate-400">Progress</th>
-                        <th className="text-right py-2 pl-2 text-xs font-semibold text-slate-400">Pencapaian</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {obj.keyResults.map((kr) => {
-                        const progress = kr.leadProgress ?? kr.teamProgress;
-                        const pct = kr.target > 0 ? Math.min((progress / kr.target) * 100, 100) : 0;
-                        return (
-                          <tr key={kr.id} className="border-b border-slate-50 last:border-0">
-                            <td className="py-2.5 pr-3 font-medium text-slate-700 max-w-[160px]">
-                              <span className="truncate block">{kr.title}</span>
-                              {kr.leadProgress !== null && <span className="text-xs text-blue-500">🔒 lead</span>}
-                            </td>
-                            <td className="py-2.5 px-2 text-right text-slate-600 tabular-nums">{kr.target}</td>
-                            <td className="py-2.5 px-2 text-right text-slate-400">{kr.unit}</td>
-                            <td className="py-2.5 px-2 text-right font-semibold text-slate-600">{kr.weight}%</td>
-                            <td className="py-2.5 px-2 text-right tabular-nums text-slate-700">{progress} / {kr.target}</td>
-                            <td className="py-2.5 pl-2 text-right">
-                              <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${achClass(pct)}`}>
-                                {pct.toFixed(0)}%
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            );
+            return <ObjectiveCard key={obj.id} obj={obj} oa={oa} index={idx} />;
           })}
         </div>
       )}

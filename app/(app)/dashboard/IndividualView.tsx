@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell, ReferenceLine,
+  ReferenceLine,
 } from "recharts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -102,36 +102,24 @@ function TrendChart({ trend }: { trend: TrendPoint[] }) {
 
 function KRChart({ krs }: { krs: KRAData[] }) {
   if (krs.length === 0) return null;
-  const data = krs.map((k) => ({
-    name: k.krTitle.length > 38 ? k.krTitle.slice(0, 38) + "…" : k.krTitle,
-    fullName: k.krTitle,
-    achievement: parseFloat(k.achievement.toFixed(1)),
-  }));
-  const chartHeight = Math.max(120, krs.length * 44);
   return (
-    <div className="mt-3" style={{ height: chartHeight }}>
-      <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 40, left: 0, bottom: 0 }}>
-          <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="#f1f5f9" />
-          <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} tickLine={false} axisLine={false} unit="%" />
-          <YAxis
-            type="category"
-            dataKey="name"
-            width={200}
-            tick={{ fontSize: 10, fill: "#64748b" }}
-            tickLine={false}
-            axisLine={false}
-          />
-          <Tooltip
-            formatter={(v, _name, props) => [`${v}%`, props.payload?.fullName ?? "Pencapaian"]}
-            contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0", maxWidth: 280 }}
-          />
-          <ReferenceLine x={100} stroke="#94a3b8" strokeDasharray="4 2" />
-          <Bar dataKey="achievement" radius={[0, 4, 4, 0]} maxBarSize={18}>
-            {data.map((d, i) => <Cell key={i} fill={barColor(d.achievement)} />)}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+    <div className="mt-3 space-y-2.5">
+      {krs.map((k) => (
+        <div key={k.kraId}>
+          <div className="flex items-start justify-between gap-3 mb-1">
+            <span className="text-xs text-slate-600 leading-snug">{k.krTitle}</span>
+            <span className={`text-xs font-bold px-2 py-0.5 rounded-lg flex-shrink-0 ${achClass(k.achievement)}`}>
+              {k.achievement.toFixed(0)}%
+            </span>
+          </div>
+          <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div
+              className="h-2 rounded-full transition-all"
+              style={{ width: `${Math.min(k.achievement, 100)}%`, backgroundColor: barColor(k.achievement) }}
+            />
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
