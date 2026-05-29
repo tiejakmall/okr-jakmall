@@ -200,11 +200,15 @@ export async function POST(req: Request) {
     mg.get(objKey)!.krs.push(row);
   }
 
-  // ── Delete existing assignments for this lead ─────────────────────────────────
+  // ── Delete existing assignments for this lead — scoped to this quarter only ───
   const existingMembers = await prisma.teamMember.findMany({ where: { leadId }, select: { id: true, name: true } });
   const existingMemberMap = new Map(existingMembers.map((m) => [norm(m.name), m]));
 
-  const existingAssignments = await prisma.objectiveAssignment.findMany({ where: { member: { leadId } }, select: { id: true } });
+  const quarterObjIds = objectives.map((o) => o.id);
+  const existingAssignments = await prisma.objectiveAssignment.findMany({
+    where: { member: { leadId }, objectiveId: { in: quarterObjIds } },
+    select: { id: true },
+  });
   if (existingAssignments.length > 0)
     await prisma.objectiveAssignment.deleteMany({ where: { id: { in: existingAssignments.map((a) => a.id) } } });
 
