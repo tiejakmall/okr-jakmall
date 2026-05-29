@@ -200,25 +200,20 @@ export async function POST(req: Request) {
     mg.get(objKey)!.krs.push(row);
   }
 
-  // ── Delete existing assignments for this lead — scoped to this quarter only ───
+  // ── Load existing members ─────────────────────────────────────────────────────
   const existingMembers = await prisma.teamMember.findMany({ where: { leadId }, select: { id: true, name: true } });
   const existingMemberMap = new Map(existingMembers.map((m) => [norm(m.name), m]));
 
   const quarterObjIds = objectives.map((o) => o.id);
-  const existingAssignments = await prisma.objectiveAssignment.findMany({
-    where: { member: { leadId }, objectiveId: { in: quarterObjIds } },
-    select: { id: true },
-  });
-  if (existingAssignments.length > 0)
-    await prisma.objectiveAssignment.deleteMany({ where: { id: { in: existingAssignments.map((a) => a.id) } } });
 
-  let createdMembers = 0, createdAssignments = 0, createdKRAs = 0;
+  let createdMembers = 0, upsertedAssignments = 0, upsertedKRAs = 0;
   const errors: string[] = [...parseErrors];
   const debugLookups: string[] = [];
   debugLookups.push(`Quarter (auto): ${resolvedQuarter.name}`);
   debugLookups.push(`Lead: ${leadId.slice(-8)}`);
-  debugLookups.push(`DB objectives: ${[...objByTitle.keys()].join(" | ")}`);
-  debugLookups.push(`File obj norms: ${fileObjNorms.join(" | ")}`);
+
+  // Track which (memberId, objectiveId) pairs are in this import — for cleanup
+  const processedMemberObjKeys = new Set<string>();
 
   for (const [memberName, memberGroup] of grouped) {
     let member = existingMemberMap.get(norm(memberName));
@@ -245,14 +240,22 @@ export async function POST(req: Request) {
       debugLookups.push(`Obj "${objNorm}" → ${obj ? `FOUND (${obj.id.slice(-6)})` : "NOT FOUND"}`);
       if (!obj) { errors.push(`Objective tidak ditemukan: "${objectiveTitle}"`); continue; }
 
+      // Upsert assignment — update weight, preserve everything else (progress untouched)
       let assignment;
       try {
-        assignment = await prisma.objectiveAssignment.create({ data: { memberId: member.id, objectiveId: obj.id, weight: objectiveWeight } });
-        createdAssignments++;
+        assignment = await prisma.objectiveAssignment.upsert({
+          where: { memberId_objectiveId: { memberId: member.id, objectiveId: obj.id } },
+          create: { memberId: member.id, objectiveId: obj.id, weight: objectiveWeight },
+          update: { weight: objectiveWeight },
+        });
+        upsertedAssignments++;
+        processedMemberObjKeys.add(`${member.id}::${obj.id}`);
       } catch (e) {
         errors.push(`Assignment ${memberName}→${obj.title}: ${String(e)}`);
         continue;
       }
+
+      const processedKrIds = new Set<string>();
 
       for (const kra of krs) {
         const krNorm = norm(kra.krTitle);
@@ -270,20 +273,46 @@ export async function POST(req: Request) {
         }
 
         try {
-          await prisma.kRAssignment.create({ data: { assignmentId: assignment.id, keyResultId: kr.id, weight: kra.krWeight, progress: 0, target: kra.individualTarget } });
-          createdKRAs++;
+          // Upsert KR assignment — update weight+target, but NEVER overwrite progress
+          await prisma.kRAssignment.upsert({
+            where: { assignmentId_keyResultId: { assignmentId: assignment.id, keyResultId: kr.id } },
+            create: { assignmentId: assignment.id, keyResultId: kr.id, weight: kra.krWeight, progress: 0, target: kra.individualTarget },
+            update: { weight: kra.krWeight, target: kra.individualTarget },
+          });
+          processedKrIds.add(kr.id);
+          upsertedKRAs++;
         } catch (e) {
           errors.push(`KRA ${memberName}→"${kra.krTitle}": ${String(e)}`);
         }
       }
+
+      // Remove KR assignments that are no longer in the file for this assignment
+      if (processedKrIds.size > 0) {
+        await prisma.kRAssignment.deleteMany({
+          where: { assignmentId: assignment.id, keyResultId: { notIn: [...processedKrIds] } },
+        });
+      }
     }
+  }
+
+  // Remove objective assignments no longer in the file (for this quarter)
+  const allQuarterAssignments = await prisma.objectiveAssignment.findMany({
+    where: { member: { leadId }, objectiveId: { in: quarterObjIds } },
+    select: { id: true, memberId: true, objectiveId: true },
+  });
+  const staleAssignments = allQuarterAssignments.filter(
+    (a) => !processedMemberObjKeys.has(`${a.memberId}::${a.objectiveId}`)
+  );
+  if (staleAssignments.length > 0) {
+    await prisma.objectiveAssignment.deleteMany({ where: { id: { in: staleAssignments.map((a) => a.id) } } });
   }
 
   return Response.json({
     success: true,
-    message: `Berhasil import ke quarter "${resolvedQuarter.name}": ${createdAssignments} assignment, ${createdKRAs} KR assignment.` +
-      (createdMembers > 0 ? ` (${createdMembers} anggota baru)` : ""),
-    created: { members: createdMembers, assignments: createdAssignments, krAssignments: createdKRAs },
+    message: `Berhasil import ke quarter "${resolvedQuarter.name}": ${upsertedAssignments} assignment, ${upsertedKRAs} KR assignment.` +
+      (createdMembers > 0 ? ` (${createdMembers} anggota baru)` : "") +
+      ` Progress yang sudah diisi tetap terjaga.`,
+    created: { members: createdMembers, assignments: upsertedAssignments, krAssignments: upsertedKRAs },
     errors: errors.length > 0 ? errors : undefined,
     debug: { rowsParsed: rows.length, lookups: debugLookups },
   });
