@@ -52,12 +52,13 @@ export default async function OKRPage({ searchParams }: { searchParams: Promise<
     orderBy: { createdAt: "asc" },
   });
 
+  const quarterObjectiveIds = objectives.map((o) => o.id);
   const teamMembers = isLead
     ? await prisma.teamMember.findMany({
         where: { leadId: session!.user.id },
         include: {
           assignments: {
-            where: { objective: { quarterId: selectedQuarter.id } },
+            where: { objectiveId: { in: quarterObjectiveIds } },
             include: {
               objective: { select: { id: true, title: true } },
               krAssignments: {
@@ -135,6 +136,7 @@ export default async function OKRPage({ searchParams }: { searchParams: Promise<
             initialMembers={JSON.parse(JSON.stringify(teamMembers))}
             objectives={JSON.parse(JSON.stringify(objectives))}
             leadId={session!.user.id}
+            quarterId={selectedQuarter.id}
           />
         </CollapsibleSection>
       )}

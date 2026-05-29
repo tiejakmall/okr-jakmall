@@ -8,9 +8,11 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const leadId = searchParams.get("leadId") ?? session.user.id;
+  const quarterIdParam = searchParams.get("quarterId");
 
-  // Fetch active quarter + objectives for this lead
-  const activeQuarter = await prisma.quarter.findFirst({ where: { isActive: true } });
+  const activeQuarter = quarterIdParam
+    ? await prisma.quarter.findUnique({ where: { id: quarterIdParam } })
+    : await prisma.quarter.findFirst({ where: { isActive: true } });
   const objectives = activeQuarter
     ? await prisma.objective.findMany({
         where: { userId: leadId, quarterId: activeQuarter.id },

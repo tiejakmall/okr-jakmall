@@ -219,12 +219,18 @@ function ImportModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Destination indicator */}
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-xs text-amber-700">
+            <span>📥</span>
+            <span>Objective akan di-import ke quarter ini: <strong>{allQuarters.find((q) => q.id === currentQuarterId)?.name ?? currentQuarterId}</strong></span>
+          </div>
+
           {otherQuarters.length === 0 ? (
             <p className="text-slate-500 text-sm text-center py-8">Tidak ada quarter lain yang tersedia.</p>
           ) : (
             <>
               <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Pilih Quarter Sumber</label>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Pilih Quarter Sumber (ambil dari)</label>
                 <select value={sourceId} onChange={(e) => loadObjectives(e.target.value)}
                   className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white">
                   <option value="">-- Pilih Quarter --</option>
@@ -293,7 +299,7 @@ function ImportModal({
                       );
                     })}
                   </div>
-                  <p className="text-xs text-slate-400 mt-3">💡 Objective diimpor sebagai DRAFT. Progress direset ke 0. Klik 🔑 untuk pilih KR spesifik.</p>
+                  <p className="text-xs text-slate-400 mt-3">💡 Objective diimpor ke <strong>{allQuarters.find((q) => q.id === currentQuarterId)?.name}</strong> sebagai DRAFT baru. Progress dari quarter sumber <strong>tidak ikut</strong> (mulai dari 0).</p>
                 </div>
               )}
             </>
@@ -377,6 +383,7 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
     const obj = await res.json();
     setObjectives((prev) => [...prev, { ...obj, keyResults: [] }]);
     setExpanded((prev) => ({ ...prev, [obj.id]: true }));
+    router.refresh(); // update DistribusiAnggota's objectives prop
   }
 
   async function updateObjective(id: string, data: Partial<Objective>) {
@@ -398,6 +405,7 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
     const res = await fetch(`/api/objectives/${id}`, { method: "DELETE" });
     if (!res.ok) { alert((await res.json()).error); return; }
     setObjectives((prev) => prev.filter((o) => o.id !== id));
+    router.refresh();
   }
 
   async function submitAllOKR() {
@@ -481,6 +489,7 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
           onImport={(newObjs) => {
             setObjectives((prev) => [...prev, ...newObjs]);
             newObjs.forEach((o) => setExpanded((p) => ({ ...p, [o.id]: true })));
+            router.refresh(); // update DistribusiAnggota's objectives prop
           }}
           onClose={() => setShowImport(false)}
         />
@@ -488,6 +497,14 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
 
       <div className="space-y-4">
         <WeightBar objectives={objectives} />
+
+        {/* Quarter sanity banner */}
+        {allQuarters.length > 0 && (
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-xs text-slate-500">
+            <span>⏱️</span>
+            <span>Quarter yang sedang diedit: <strong className="text-slate-700">{allQuarters.find((q) => q.id === quarterId)?.name ?? quarterId}</strong></span>
+          </div>
+        )}
 
         {/* Status banners */}
         {allSubmitted ? (

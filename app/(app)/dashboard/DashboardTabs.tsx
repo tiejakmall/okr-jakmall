@@ -9,9 +9,10 @@ type Props = {
   quarters: { id: string; name: string; isActive: boolean }[];
   members: { id: string; name: string }[];
   leadId: string;
+  defaultQuarterId?: string;
 };
 
-export default function DashboardTabs({ title, quarters, members, leadId }: Props) {
+export default function DashboardTabs({ title, quarters, members, leadId, defaultQuarterId }: Props) {
   const [tab, setTab] = useState<"division" | "individual">("division");
 
   return (
@@ -45,9 +46,9 @@ export default function DashboardTabs({ title, quarters, members, leadId }: Prop
 
       {/* Content */}
       {tab === "division" ? (
-        <DivisionView quarters={quarters} leadId={leadId} divisionName={title} />
+        <DivisionView quarters={quarters} leadId={leadId} divisionName={title} defaultQuarterId={defaultQuarterId} />
       ) : (
-        <IndividualView quarters={quarters} members={members} leadId={leadId} />
+        <IndividualView quarters={quarters} members={members} leadId={leadId} defaultQuarterId={defaultQuarterId} />
       )}
     </div>
   );

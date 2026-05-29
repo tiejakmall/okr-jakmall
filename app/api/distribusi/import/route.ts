@@ -2,9 +2,30 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import ExcelJS from "exceljs";
 
-// Normalize title: collapse whitespace + newlines, trim, lowercase for matching
+// Normalize title using explicit code-point checks — no invisible literal chars
 function norm(s: string): string {
-  return s.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim().toLowerCase();
+  let out = "";
+  for (const ch of s) {
+    const cp = ch.codePointAt(0) ?? 0;
+    // Skip zero-width / invisible chars
+    if (
+      cp === 0x200b || cp === 0x200c || cp === 0x200d ||
+      cp === 0x200e || cp === 0x200f || cp === 0x00ad ||
+      cp === 0xfeff || cp === 0x2028 || cp === 0x2029
+    ) continue;
+    // Unicode spaces → ASCII space
+    if (
+      cp === 0x00a0 || cp === 0x1680 ||
+      (cp >= 0x2000 && cp <= 0x200a) ||
+      cp === 0x202f || cp === 0x205f || cp === 0x3000
+    ) { out += " "; continue; }
+    out += ch;
+  }
+  return out
+    .replace(/[\r\n\t]+/g, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim()
+    .toLowerCase();
 }
 
 function readStr(cell: ExcelJS.Cell): string {
@@ -36,16 +57,23 @@ function readNum(cell: ExcelJS.Cell): number | null {
 
 export async function POST(req: Request) {
   const session = await auth();
-  if (!session || session.user.role === "MEMBER") return Response.json({ error: "Forbidden" }, { status: 403 });
+  if (!session || session.user.role === "MEMBER")
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+
+  // leadId and quarterId from URL query params (reliable for multipart POST)
+  const { searchParams } = new URL(req.url);
+  const hintQuarterId = searchParams.get("quarterId") || null;
+  const urlLeadId = searchParams.get("leadId") || null;
 
   let fileBuffer: ArrayBuffer;
   let leadId: string;
   try {
     const formData = await req.formData();
     const file = formData.get("file");
-    if (!file || typeof file === "string") return Response.json({ error: "File tidak ditemukan." }, { status: 400 });
+    if (!file || typeof file === "string")
+      return Response.json({ error: "File tidak ditemukan." }, { status: 400 });
     fileBuffer = await (file as File).arrayBuffer();
-    leadId = (formData.get("leadId") as string) ?? session.user.id;
+    leadId = urlLeadId ?? (formData.get("leadId") as string) ?? session.user.id;
   } catch {
     return Response.json({ error: "Gagal membaca form." }, { status: 400 });
   }
@@ -61,86 +89,109 @@ export async function POST(req: Request) {
       if (!/petunjuk/i.test(ws.name)) { sheet = ws; break; }
     }
   }
-  if (!sheet) return Response.json({ error: "Sheet 'Distribusi' tidak ditemukan." }, { status: 400 });
+  if (!sheet)
+    return Response.json({ error: "Sheet 'Distribusi' tidak ditemukan." }, { status: 400 });
 
-  const activeQuarter = await prisma.quarter.findFirst({ where: { isActive: true } });
-  if (!activeQuarter) return Response.json({ error: "Tidak ada quarter aktif." }, { status: 400 });
-
-  // Fetch objectives + KRs
-  const objectives = await prisma.objective.findMany({
-    where: { userId: leadId, quarterId: activeQuarter.id },
-    include: { keyResults: true },
-  });
-
-  if (objectives.length === 0)
-    return Response.json({ error: "Belum ada objective untuk quarter aktif. Buat objective dulu di halaman OKR." }, { status: 400 });
-
-  // Build lookup maps — use normalized titles
-  const objByTitle = new Map(objectives.map((o) => [norm(o.title), o]));
-  // KR lookup: composite key "objId::krTitle" to avoid collision across objectives
-  const krByKey = new Map(
-    objectives.flatMap((o) => o.keyResults.map((kr) => [`${o.id}::${norm(kr.title)}`, kr]))
-  );
-
-  // ── Parse rows ───────────────────────────────────────────────────────────────
-  // Template columns: A=Anggota, B=Objective, C=Bobot Obj, D=Key Result, E=Target Individu, F=Satuan, G=Bobot KR
+  // ── Parse rows first — quarter detection comes after ─────────────────────────
   type RowData = {
     memberName: string; objectiveTitle: string; objectiveWeight: number;
     krTitle: string; individualTarget: number | null; krWeight: number;
   };
-
   const rows: RowData[] = [];
   let lastMember = "";
   let lastObjective = "";
   let lastObjectiveWeight = 0;
   const parseErrors: string[] = [];
-
   const maxRow = sheet.rowCount;
+
   for (let rowNum = 3; rowNum <= maxRow; rowNum++) {
     const row = sheet.getRow(rowNum);
+    const memberName = readStr(row.getCell(1)).replace(/[\r\n]+/g, " ").trim();
+    const objTitle   = readStr(row.getCell(2)).replace(/[\r\n]+/g, " ").trim();
+    const objWeight  = readNum(row.getCell(3)) ?? lastObjectiveWeight;
+    const krTitle    = readStr(row.getCell(4)).replace(/[\r\n]+/g, " ").trim();
+    const indTarget  = readNum(row.getCell(5));
+    const krWeight   = readNum(row.getCell(7)) ?? 0;
 
-    const memberName  = readStr(row.getCell(1)).replace(/[\r\n]+/g, " ").trim();
-    const objTitle    = readStr(row.getCell(2)).replace(/[\r\n]+/g, " ").trim();
-    const objWeight   = readNum(row.getCell(3)) ?? lastObjectiveWeight;
-    const krTitle     = readStr(row.getCell(4)).replace(/[\r\n]+/g, " ").trim();
-    const indTarget   = readNum(row.getCell(5));
-    const krWeight    = readNum(row.getCell(7)) ?? 0;
-
-    if (memberName) { lastMember = memberName; }
+    if (memberName) lastMember = memberName;
     if (objTitle)   { lastObjective = objTitle; lastObjectiveWeight = objWeight; }
-    else if (objWeight > 0) { lastObjectiveWeight = objWeight; }
+    else if (objWeight > 0) lastObjectiveWeight = objWeight;
 
-    if (!krTitle) continue; // no KR = skip row
+    if (!krTitle) continue;
+    if (!lastMember) { parseErrors.push(`Baris ${rowNum}: KR "${krTitle}" tidak punya anggota.`); continue; }
+    if (!lastObjective) { parseErrors.push(`Baris ${rowNum}: KR "${krTitle}" tidak punya objective.`); continue; }
 
-    if (!lastMember) {
-      parseErrors.push(`Baris ${rowNum}: KR "${krTitle}" tidak punya anggota.`);
-      continue;
-    }
-    if (!lastObjective) {
-      parseErrors.push(`Baris ${rowNum}: KR "${krTitle}" tidak punya objective.`);
-      continue;
-    }
-
-    rows.push({
-      memberName: lastMember,
-      objectiveTitle: lastObjective,
-      objectiveWeight: lastObjectiveWeight,
-      krTitle,
-      individualTarget: indTarget,
-      krWeight,
-    });
+    rows.push({ memberName: lastMember, objectiveTitle: lastObjective, objectiveWeight: lastObjectiveWeight, krTitle, individualTarget: indTarget, krWeight });
   }
 
   if (rows.length === 0)
-    return Response.json({
-      error: "Tidak ada data KR yang terbaca. Pastikan kolom D (Key Result) terisi.",
-      debug: { maxRow, parseErrors },
-    }, { status: 400 });
+    return Response.json({ error: "Tidak ada data KR yang terbaca. Pastikan kolom D (Key Result) terisi.", debug: { maxRow, parseErrors } }, { status: 400 });
 
-  // ── Group: memberName → objectiveTitle(normalized) → { weight, krs[] } ──────
+  // ── Auto-detect which quarter the file belongs to ────────────────────────────
+  const fileObjNorms = [...new Set(rows.map((r) => norm(r.objectiveTitle)))];
+
+  // Fetch ALL objectives for this lead across all quarters
+  const allLeadObjs = await prisma.objective.findMany({
+    where: { userId: leadId },
+    select: { id: true, title: true, quarterId: true },
+  });
+
+  // Find which quarters contain objectives that match the file
+  const matchingQuarterIds = new Set<string>();
+  for (const obj of allLeadObjs) {
+    const on = norm(obj.title);
+    if (fileObjNorms.some((fn) => fn === on || fn.includes(on) || on.includes(fn))) {
+      matchingQuarterIds.add(obj.quarterId);
+    }
+  }
+
+  let resolvedQuarterId: string;
+
+  if (matchingQuarterIds.size === 1) {
+    // Perfect: exactly one quarter matches — use it regardless of hintQuarterId
+    [resolvedQuarterId] = matchingQuarterIds;
+  } else if (matchingQuarterIds.size > 1) {
+    // Multiple quarters match — use the hint if it's one of them, else error
+    if (hintQuarterId && matchingQuarterIds.has(hintQuarterId)) {
+      resolvedQuarterId = hintQuarterId;
+    } else {
+      const quarters = await prisma.quarter.findMany({ where: { id: { in: [...matchingQuarterIds] } }, select: { name: true } });
+      return Response.json({ error: `Objective ditemukan di beberapa quarter: ${quarters.map((q) => q.name).join(", ")}. Pilih salah satu quarter tersebut di UI, lalu import ulang.` }, { status: 400 });
+    }
+  } else {
+    // Not found in any quarter under this leadId
+    const fallback = hintQuarterId
+      ? await prisma.quarter.findUnique({ where: { id: hintQuarterId } })
+      : await prisma.quarter.findFirst({ where: { isActive: true } });
+    return Response.json({
+      error: `Tidak ada objective di file yang cocok dengan database. Pastikan kolom B (Objective) tidak diubah dari template.`,
+      debug: {
+        leadId: leadId.slice(-8),
+        hintQuarter: fallback?.name ?? hintQuarterId,
+        dbObjectivesForLead: allLeadObjs.map((o) => `${norm(o.title)} [q:${o.quarterId.slice(-6)}]`),
+        fileObjNorms,
+      },
+    }, { status: 400 });
+  }
+
+  const resolvedQuarter = await prisma.quarter.findUnique({ where: { id: resolvedQuarterId } });
+  if (!resolvedQuarter)
+    return Response.json({ error: "Quarter tidak dapat ditemukan." }, { status: 400 });
+
+  // ── Fetch objectives + KRs for the resolved quarter ──────────────────────────
+  const objectives = await prisma.objective.findMany({
+    where: { userId: leadId, quarterId: resolvedQuarterId },
+    include: { keyResults: true },
+  });
+
+  const objByTitle = new Map(objectives.map((o) => [norm(o.title), o]));
+  const krByKey = new Map(
+    objectives.flatMap((o) => o.keyResults.map((kr) => [`${o.id}::${norm(kr.title)}`, kr]))
+  );
+
+  // ── Group rows ────────────────────────────────────────────────────────────────
   type MemberGroup = Map<string, { objectiveTitle: string; objectiveWeight: number; krs: RowData[] }>;
   const grouped = new Map<string, MemberGroup>();
-
   for (const row of rows) {
     if (!grouped.has(row.memberName)) grouped.set(row.memberName, new Map());
     const mg = grouped.get(row.memberName)!;
@@ -149,38 +200,23 @@ export async function POST(req: Request) {
     mg.get(objKey)!.krs.push(row);
   }
 
-  // ── Delete existing assignments ──────────────────────────────────────────────
-  const existingMembers = await prisma.teamMember.findMany({
-    where: { leadId },
-    select: { id: true, name: true },
-  });
+  // ── Delete existing assignments for this lead ─────────────────────────────────
+  const existingMembers = await prisma.teamMember.findMany({ where: { leadId }, select: { id: true, name: true } });
   const existingMemberMap = new Map(existingMembers.map((m) => [norm(m.name), m]));
 
-  const existingAssignments = await prisma.objectiveAssignment.findMany({
-    where: { member: { leadId } },
-    select: { id: true },
-  });
-  if (existingAssignments.length > 0) {
-    await prisma.objectiveAssignment.deleteMany({
-      where: { id: { in: existingAssignments.map((a) => a.id) } },
-    });
-  }
+  const existingAssignments = await prisma.objectiveAssignment.findMany({ where: { member: { leadId } }, select: { id: true } });
+  if (existingAssignments.length > 0)
+    await prisma.objectiveAssignment.deleteMany({ where: { id: { in: existingAssignments.map((a) => a.id) } } });
 
   let createdMembers = 0, createdAssignments = 0, createdKRAs = 0;
   const errors: string[] = [...parseErrors];
-
-  // Debug: track what was found/not found
   const debugLookups: string[] = [];
+  debugLookups.push(`Quarter (auto): ${resolvedQuarter.name}`);
+  debugLookups.push(`Lead: ${leadId.slice(-8)}`);
   debugLookups.push(`DB objectives: ${[...objByTitle.keys()].join(" | ")}`);
-  debugLookups.push(`DB KR keys (sample): ${[...krByKey.keys()].slice(0, 5).join(" | ")}`);
-  debugLookups.push(`Parsed rows: ${rows.length}`);
-  const uniqueObjTitles = [...new Set(rows.map((r) => norm(r.objectiveTitle)))];
-  debugLookups.push(`File obj norms: ${uniqueObjTitles.join(" | ")}`);
-  const uniqueKRTitles = [...new Set(rows.map((r) => norm(r.krTitle)))];
-  debugLookups.push(`File KR norms: ${uniqueKRTitles.join(" | ")}`);
+  debugLookups.push(`File obj norms: ${fileObjNorms.join(" | ")}`);
 
   for (const [memberName, memberGroup] of grouped) {
-    // Find or create member
     let member = existingMemberMap.get(norm(memberName));
     if (!member) {
       try {
@@ -195,57 +231,45 @@ export async function POST(req: Request) {
 
     for (const [, { objectiveTitle, objectiveWeight, krs }] of memberGroup) {
       const objNorm = norm(objectiveTitle);
-      const obj = objByTitle.get(objNorm);
-      debugLookups.push(`Lookup obj "${objNorm}" → ${obj ? `FOUND (${obj.id.slice(-6)})` : "NOT FOUND"}`);
+      let obj = objByTitle.get(objNorm);
+
+      // Fuzzy fallback
       if (!obj) {
-        errors.push(`❌ Objective tidak ditemukan di DB: "${objectiveTitle}"`);
-        continue;
+        obj = objectives.find((o) => norm(o.title).includes(objNorm) || objNorm.includes(norm(o.title)));
       }
+
+      debugLookups.push(`Obj "${objNorm}" → ${obj ? `FOUND (${obj.id.slice(-6)})` : "NOT FOUND"}`);
+      if (!obj) { errors.push(`Objective tidak ditemukan: "${objectiveTitle}"`); continue; }
 
       let assignment;
       try {
-        assignment = await prisma.objectiveAssignment.create({
-          data: { memberId: member.id, objectiveId: obj.id, weight: objectiveWeight },
-        });
+        assignment = await prisma.objectiveAssignment.create({ data: { memberId: member.id, objectiveId: obj.id, weight: objectiveWeight } });
         createdAssignments++;
       } catch (e) {
-        errors.push(`❌ Assignment ${memberName}→${obj.title}: ${String(e)}`);
+        errors.push(`Assignment ${memberName}→${obj.title}: ${String(e)}`);
         continue;
       }
 
       for (const kra of krs) {
         const krNorm = norm(kra.krTitle);
         const krKey = `${obj.id}::${krNorm}`;
-        const kr = krByKey.get(krKey);
-        debugLookups.push(`  Lookup KR key "${krKey.slice(-40)}" → ${kr ? `FOUND` : "NOT FOUND"}`);
+        let kr = krByKey.get(krKey);
+
+        // Fuzzy KR fallback
         if (!kr) {
-          // Try fuzzy: find any KR in this obj whose title contains the kra title or vice versa
-          const fuzzy = obj.keyResults.find(
-            (k) => norm(k.title).includes(krNorm) || krNorm.includes(norm(k.title))
-          );
-          debugLookups.push(`  Fuzzy for "${krNorm}" → ${fuzzy ? `FOUND "${fuzzy.title.slice(0, 30)}"` : "NOT FOUND"}`);
+          const fuzzy = obj.keyResults.find((k) => norm(k.title).includes(krNorm) || krNorm.includes(norm(k.title)));
           if (!fuzzy) {
-            errors.push(`❌ KR tidak ditemukan: "${kra.krTitle}" di obj "${obj.title}". KR yg ada: ${obj.keyResults.map((k) => `"${k.title}"`).join(", ")}`);
+            errors.push(`KR tidak ditemukan: "${kra.krTitle}" di "${obj.title}"`);
             continue;
           }
-          try {
-            await prisma.kRAssignment.create({
-              data: { assignmentId: assignment.id, keyResultId: fuzzy.id, weight: kra.krWeight, progress: 0, target: kra.individualTarget },
-            });
-            createdKRAs++;
-          } catch (e) {
-            errors.push(`❌ KRA (fuzzy) ${memberName}→"${kra.krTitle}": ${String(e)}`);
-          }
-          continue;
+          kr = fuzzy;
         }
 
         try {
-          await prisma.kRAssignment.create({
-            data: { assignmentId: assignment.id, keyResultId: kr.id, weight: kra.krWeight, progress: 0, target: kra.individualTarget },
-          });
+          await prisma.kRAssignment.create({ data: { assignmentId: assignment.id, keyResultId: kr.id, weight: kra.krWeight, progress: 0, target: kra.individualTarget } });
           createdKRAs++;
         } catch (e) {
-          errors.push(`❌ KRA ${memberName}→"${kra.krTitle}": ${String(e)}`);
+          errors.push(`KRA ${memberName}→"${kra.krTitle}": ${String(e)}`);
         }
       }
     }
@@ -253,7 +277,7 @@ export async function POST(req: Request) {
 
   return Response.json({
     success: true,
-    message: `Berhasil: ${createdAssignments} assignment, ${createdKRAs} KR assignment dibuat.` +
+    message: `Berhasil import ke quarter "${resolvedQuarter.name}": ${createdAssignments} assignment, ${createdKRAs} KR assignment.` +
       (createdMembers > 0 ? ` (${createdMembers} anggota baru)` : ""),
     created: { members: createdMembers, assignments: createdAssignments, krAssignments: createdKRAs },
     errors: errors.length > 0 ? errors : undefined,

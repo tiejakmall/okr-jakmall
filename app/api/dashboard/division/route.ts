@@ -23,10 +23,13 @@ export async function GET(req: Request) {
   });
 
   // 2. Team members + their assignments + KR assignments
+  // Filter assignments by the objective IDs already fetched for this quarter (avoids relation filter issues)
+  const quarterObjectiveIds = objectivesRaw.map((o) => o.id);
   const members = await prisma.teamMember.findMany({
     where: { leadId },
     include: {
       assignments: {
+        where: { objectiveId: { in: quarterObjectiveIds } },
         include: { krAssignments: true },
       },
     },

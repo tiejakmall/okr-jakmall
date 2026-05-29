@@ -223,11 +223,12 @@ type Props = {
   quarters: { id: string; name: string; isActive: boolean }[];
   members: { id: string; name: string }[];
   leadId: string;
+  defaultQuarterId?: string;
 };
 
-export default function IndividualView({ quarters, members, leadId }: Props) {
+export default function IndividualView({ quarters, members, leadId, defaultQuarterId }: Props) {
   const activeQ = quarters.find((q) => q.isActive) ?? quarters[0];
-  const [selectedQ, setSelectedQ] = useState(activeQ?.id ?? "");
+  const [selectedQ, setSelectedQ] = useState(defaultQuarterId ?? activeQ?.id ?? "");
   const [selectedMember, setSelectedMember] = useState(members[0]?.id ?? "");
   const [data, setData] = useState<IndividualData | null>(null);
   const [trend, setTrend] = useState<TrendPoint[]>([]);

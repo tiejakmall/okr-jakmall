@@ -234,11 +234,12 @@ type Props = {
   quarters: { id: string; name: string; isActive: boolean }[];
   leadId: string;
   divisionName: string;
+  defaultQuarterId?: string;
 };
 
-export default function DivisionView({ quarters, leadId, divisionName }: Props) {
+export default function DivisionView({ quarters, leadId, divisionName, defaultQuarterId }: Props) {
   const activeQ = quarters.find((q) => q.isActive) ?? quarters[0];
-  const [selectedQ, setSelectedQ] = useState(activeQ?.id ?? "");
+  const [selectedQ, setSelectedQ] = useState(defaultQuarterId ?? activeQ?.id ?? "");
   const [data, setData] = useState<DivisionData | null>(null);
   const [loading, setLoading] = useState(false);
 

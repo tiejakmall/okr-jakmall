@@ -24,9 +24,12 @@ export async function GET(req: Request) {
 
   const { searchParams } = new URL(req.url);
   const leadId = searchParams.get("leadId") ?? session.user.id;
+  const quarterIdParam = searchParams.get("quarterId");
 
-  const activeQuarter = await prisma.quarter.findFirst({ where: { isActive: true } });
-  if (!activeQuarter) return new Response("Tidak ada quarter aktif.", { status: 404 });
+  const activeQuarter = quarterIdParam
+    ? await prisma.quarter.findUnique({ where: { id: quarterIdParam } })
+    : await prisma.quarter.findFirst({ where: { isActive: true } });
+  if (!activeQuarter) return new Response("Quarter tidak ditemukan.", { status: 404 });
 
   // Fetch all team members with their full assignment tree
   const members = await prisma.teamMember.findMany({

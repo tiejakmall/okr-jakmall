@@ -52,11 +52,12 @@ export async function GET(req: Request) {
     ])
   );
 
-  // Get member's assignments for this quarter (assignments where objective.quarterId = quarterId)
+  // Get member's assignments for this quarter using explicit objective IDs (avoids relation filter issues)
+  const quarterObjectiveIds = objectives.map((o) => o.id);
   const assignments = await prisma.objectiveAssignment.findMany({
     where: {
       memberId,
-      objective: { userId: leadId, quarterId },
+      objectiveId: { in: quarterObjectiveIds },
     },
     include: { krAssignments: true },
   });

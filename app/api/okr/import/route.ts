@@ -39,18 +39,22 @@ export async function POST(req: Request) {
 
   const userId = session.user.id;
 
-  const activeQuarter = await prisma.quarter.findFirst({ where: { isActive: true } });
-  if (!activeQuarter) return Response.json({ error: "Tidak ada quarter aktif." }, { status: 400 });
-
   let fileBuffer: ArrayBuffer;
+  let quarterIdParam: string | null = null;
   try {
     const formData = await req.formData();
     const file = formData.get("file");
     if (!file || typeof file === "string") return Response.json({ error: "File tidak ditemukan." }, { status: 400 });
     fileBuffer = await (file as File).arrayBuffer();
+    quarterIdParam = formData.get("quarterId") as string | null;
   } catch {
     return Response.json({ error: "Gagal membaca file." }, { status: 400 });
   }
+
+  const activeQuarter = quarterIdParam
+    ? await prisma.quarter.findUnique({ where: { id: quarterIdParam } })
+    : await prisma.quarter.findFirst({ where: { isActive: true } });
+  if (!activeQuarter) return Response.json({ error: "Quarter tidak ditemukan." }, { status: 400 });
 
   const wb = new ExcelJS.Workbook();
   try { await wb.xlsx.load(fileBuffer); } catch {

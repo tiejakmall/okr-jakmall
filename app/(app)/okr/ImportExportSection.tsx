@@ -41,6 +41,7 @@ export default function ImportExportSection({ quarterId }: Props) {
     setResult(null);
     const form = new FormData();
     form.append("file", file);
+    form.append("quarterId", quarterId);
     try {
       const res = await fetch("/api/okr/import", { method: "POST", body: form });
       const data = await res.json();

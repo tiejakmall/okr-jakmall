@@ -43,6 +43,7 @@ type Props = {
   initialMembers: Member[];
   objectives: Objective[];
   leadId: string;
+  quarterId: string;
 };
 
 const btnDanger = "text-slate-300 hover:text-red-500 transition-colors duration-100";
@@ -360,14 +361,15 @@ type ImportResult = { type: "success" | "error"; message: string; errors?: strin
 type PreviewRow = { r: number; A: string; B: string; C: string; D: string; E: string; F: string; G: string };
 type MatchInfo = { title: string; matched: boolean; dbTitle?: string | null };
 type PreviewResult = {
-  sheetNames: string[]; selectedSheet: string; maxRow: number;
+  sheetNames: string[]; selectedSheet: string; selectedQuarter?: string | null; maxRow: number;
   rows: PreviewRow[];
   matching: { objectives: MatchInfo[]; keyResults: MatchInfo[] };
   db: { objectives: string[]; keyResults: string[] };
   error?: string;
+  quarterHint?: string | null;
 };
 
-function DistribusiExcel({ leadId, objectives }: { leadId: string; objectives: Objective[] }) {
+function DistribusiExcel({ leadId, objectives, quarterId }: { leadId: string; objectives: Objective[]; quarterId: string }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
@@ -375,8 +377,8 @@ function DistribusiExcel({ leadId, objectives }: { leadId: string; objectives: O
   const [result, setResult] = useState<ImportResult | null>(null);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
 
-  function handleTemplate() { window.location.href = `/api/distribusi/template?leadId=${leadId}`; }
-  function handleExport() { window.location.href = `/api/distribusi/export?leadId=${leadId}`; }
+  function handleTemplate() { window.location.href = `/api/distribusi/template?leadId=${leadId}&quarterId=${quarterId}`; }
+  function handleExport() { window.location.href = `/api/distribusi/export?leadId=${leadId}&quarterId=${quarterId}`; }
 
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -388,7 +390,7 @@ function DistribusiExcel({ leadId, objectives }: { leadId: string; objectives: O
     form.append("file", file);
     form.append("leadId", leadId);
     try {
-      const res = await fetch("/api/distribusi/import", { method: "POST", body: form });
+      const res = await fetch(`/api/distribusi/import?leadId=${encodeURIComponent(leadId)}&quarterId=${encodeURIComponent(quarterId)}`, { method: "POST", body: form });
       const data = await res.json();
       if (res.ok && data.success) {
         setResult({ type: "success", message: data.message, errors: data.errors, debug: data.debug });
@@ -415,7 +417,7 @@ function DistribusiExcel({ leadId, objectives }: { leadId: string; objectives: O
     form.append("file", file);
     form.append("leadId", leadId);
     try {
-      const res = await fetch("/api/distribusi/preview", { method: "POST", body: form });
+      const res = await fetch(`/api/distribusi/preview?leadId=${encodeURIComponent(leadId)}&quarterId=${encodeURIComponent(quarterId)}`, { method: "POST", body: form });
       setPreview(await res.json());
     } catch {
       setPreview({ sheetNames: [], selectedSheet: "", maxRow: 0, rows: [], matching: { objectives: [], keyResults: [] }, db: { objectives: [], keyResults: [] }, error: "Gagal membaca file." });
@@ -493,10 +495,20 @@ function DistribusiExcel({ leadId, objectives }: { leadId: string; objectives: O
             <div className="bg-violet-50 px-4 py-2.5 flex items-center justify-between">
               <div>
                 <p className="font-bold text-violet-800">🔍 Preview — sheet: {preview.selectedSheet}</p>
-                <p className="text-violet-500">{preview.maxRow} baris · sheets: {preview.sheetNames.join(", ")}</p>
+                <p className="text-violet-500">
+                  {preview.maxRow} baris · sheets: {preview.sheetNames.join(", ")}
+                  {preview.selectedQuarter && <> · DB quarter: <strong>{preview.selectedQuarter}</strong></>}
+                </p>
               </div>
               <button onClick={() => setPreview(null)} className="text-violet-400 hover:text-violet-700 text-base">✕</button>
             </div>
+
+            {preview.quarterHint && (
+              <div className="bg-amber-50 border-b border-amber-200 px-4 py-2.5 flex items-start gap-2 text-amber-800">
+                <span className="flex-shrink-0 text-base">⚠️</span>
+                <p className="font-semibold">{preview.quarterHint}</p>
+              </div>
+            )}
 
             {preview.error && <p className="px-4 py-3 text-red-600">{preview.error}</p>}
 
@@ -589,7 +601,7 @@ function DistribusiExcel({ leadId, objectives }: { leadId: string; objectives: O
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function DistribusiAnggota({ initialMembers, objectives, leadId }: Props) {
+export default function DistribusiAnggota({ initialMembers, objectives, leadId, quarterId }: Props) {
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -726,7 +738,7 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId }
   return (
     <div className="space-y-5">
       {/* Excel import/export */}
-      <DistribusiExcel leadId={leadId} objectives={objectives} />
+      <DistribusiExcel leadId={leadId} objectives={objectives} quarterId={quarterId} />
 
       {/* Add member */}
       <div className="flex gap-2">
