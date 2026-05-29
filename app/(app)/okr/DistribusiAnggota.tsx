@@ -599,6 +599,83 @@ function DistribusiExcel({ leadId, objectives, quarterId }: { leadId: string; ob
   );
 }
 
+// ─── Progress Excel Import ────────────────────────────────────────────────────
+
+type ProgressImportResult = { type: "success" | "error"; message: string; errors?: string[] };
+
+function ProgressExcel({ leadId, quarterId }: { leadId: string; quarterId: string }) {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [importing, setImporting] = useState(false);
+  const [result, setResult] = useState<ProgressImportResult | null>(null);
+
+  function handleTemplate() {
+    window.location.href = `/api/progress/template?leadId=${encodeURIComponent(leadId)}&quarterId=${encodeURIComponent(quarterId)}`;
+  }
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setResult(null);
+    const form = new FormData();
+    form.append("file", file);
+    try {
+      const res = await fetch(`/api/progress/import?leadId=${encodeURIComponent(leadId)}`, { method: "POST", body: form });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setResult({ type: "success", message: data.message, errors: data.errors });
+        if (!data.errors?.length) setTimeout(() => window.location.reload(), 1400);
+      } else {
+        setResult({ type: "error", message: data.error ?? "Import gagal.", errors: data.errors });
+      }
+    } catch {
+      setResult({ type: "error", message: "Terjadi kesalahan jaringan." });
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+      <div className="px-5 py-4 bg-slate-50 border-b border-slate-100">
+        <h3 className="font-bold text-slate-700 text-sm">📈 Update Progress via Excel</h3>
+        <p className="text-xs text-slate-400 mt-0.5">Download template → isi kolom Progress → upload kembali</p>
+      </div>
+      <div className="p-4 flex flex-wrap gap-2 items-center">
+        <button
+          onClick={handleTemplate}
+          className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border border-slate-200 bg-white text-slate-700
+            shadow-[0_3px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-0.5
+            active:shadow-none active:translate-y-[3px] transition-all duration-75"
+        >
+          📥 Download Template Progress
+        </button>
+
+        <label className={`flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl cursor-pointer
+          bg-amber-400 text-gray-900 shadow-[0_3px_0_#d97706] hover:shadow-[0_1px_0_#d97706] hover:translate-y-0.5
+          active:shadow-none active:translate-y-[3px] transition-all duration-75
+          ${importing ? "opacity-50 pointer-events-none" : ""}`}
+        >
+          {importing ? "⏳ Mengimpor..." : "📤 Import Progress"}
+          <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} disabled={importing} />
+        </label>
+      </div>
+
+      {result && (
+        <div className={`mx-4 mb-4 rounded-xl px-4 py-3 text-sm ${result.type === "success" ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"}`}>
+          <p className="font-semibold">{result.type === "success" ? "✅" : "❌"} {result.message}</p>
+          {result.errors && result.errors.length > 0 && (
+            <ul className="mt-2 space-y-0.5 text-xs list-disc list-inside">
+              {result.errors.map((e, i) => <li key={i}>{e}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function DistribusiAnggota({ initialMembers, objectives, leadId, quarterId }: Props) {
@@ -737,8 +814,11 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
 
   return (
     <div className="space-y-5">
-      {/* Excel import/export */}
+      {/* Distribusi Excel import/export */}
       <DistribusiExcel leadId={leadId} objectives={objectives} quarterId={quarterId} />
+
+      {/* Progress Excel import */}
+      <ProgressExcel leadId={leadId} quarterId={quarterId} />
 
       {/* Add member */}
       <div className="flex gap-2">
