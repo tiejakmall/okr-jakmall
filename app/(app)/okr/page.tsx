@@ -109,10 +109,10 @@ export default async function OKRPage({ searchParams }: { searchParams: Promise<
         />
       </CollapsibleSection>
 
-      {/* Import / Export */}
+      {/* Import / Export OKR Divisi */}
       <CollapsibleSection
-        title="Import / Export Excel"
-        subtitle="Download template → isi → upload, atau ekspor data OKR ke Excel"
+        title="Import / Export OKR Divisi"
+        subtitle="Import atau ekspor data OKR Divisi (objective & key result) — gunakan template Excel yang tersedia"
         defaultOpen={false}
       >
         <ImportExportSection quarterId={selectedQuarter.id} />
@@ -121,8 +121,8 @@ export default async function OKRPage({ searchParams }: { searchParams: Promise<
       {/* Bagian 2: Distribusi ke anggota */}
       {isLead && (
         <CollapsibleSection
-          title="Distribusi ke Anggota"
-          subtitle="Assign anggota ke objective + key result. Bobot objective harus 100%, bobot KR per objective harus 100%."
+          title="Distribusi OKR Individu ke Anggota"
+          subtitle="Assign anggota ke objective + key result divisi, lalu isi bobot & target individu. Bobot objective harus 100%, bobot KR per objective harus 100%."
           badge={
             teamMembers.length > 0 ? (
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500">
@@ -137,6 +137,7 @@ export default async function OKRPage({ searchParams }: { searchParams: Promise<
             objectives={JSON.parse(JSON.stringify(objectives))}
             leadId={session!.user.id}
             quarterId={selectedQuarter.id}
+            leadDivision={session!.user.division ?? undefined}
           />
         </CollapsibleSection>
       )}

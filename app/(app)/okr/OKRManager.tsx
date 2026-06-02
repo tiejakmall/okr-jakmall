@@ -410,7 +410,7 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
 
   async function submitAllOKR() {
     if (!weightOk) { alert("Total bobot objective harus 100% sebelum dikumpulkan."); return; }
-    if (!confirm("Kumpulkan semua OKR? Setelah dikumpulkan, kamu tidak bisa mengubah objective dan key result.")) return;
+    if (!confirm("Cek kembali OKR yang sudah diisi di bawah ini sebelum mengumpulkan.\n\nSetelah dikumpulkan, OKR masih bisa diubah dengan kembali ke status Draft.\n\nLanjutkan kumpulkan OKR?")) return;
     setSaving(true);
     for (const obj of objectives.filter((o) => o.status === "DRAFT")) {
       await fetch(`/api/objectives/${obj.id}`, {
@@ -524,7 +524,10 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
 
         {/* Action bar */}
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <p className="text-xs text-slate-400">{saving ? "⏳ Menyimpan..." : "💾 Tersimpan otomatis"}</p>
+          <div className="text-xs text-slate-400 space-y-0.5">
+            <p>{saving ? "⏳ Menyimpan..." : "💾 Tersimpan otomatis"}</p>
+            {!allSubmitted && <p className="text-amber-500 font-medium">⚠️ Tersimpan ≠ dikumpulkan. Klik "Kumpulkan OKR" jika sudah selesai.</p>}
+          </div>
 
           <div className="flex gap-2 flex-wrap justify-end">
             {/* Bulk delete controls */}

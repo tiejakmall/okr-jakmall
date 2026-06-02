@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Trash2, ChevronDown, ChevronUp } from "lucide-react";
 
 type KRAssignment = {
@@ -44,6 +44,7 @@ type Props = {
   objectives: Objective[];
   leadId: string;
   quarterId: string;
+  leadDivision?: string;
 };
 
 const btnDanger = "text-slate-300 hover:text-red-500 transition-colors duration-100";
@@ -639,8 +640,8 @@ function ProgressExcel({ leadId, quarterId }: { leadId: string; quarterId: strin
   return (
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
       <div className="px-5 py-4 bg-slate-50 border-b border-slate-100">
-        <h3 className="font-bold text-slate-700 text-sm">📈 Update Progress via Excel</h3>
-        <p className="text-xs text-slate-400 mt-0.5">Download template → isi kolom Progress → upload kembali</p>
+        <h3 className="font-bold text-slate-700 text-sm">📈 Update Progress OKR Individu via Excel</h3>
+        <p className="text-xs text-slate-400 mt-0.5">Setelah OKR Divisi selesai & distribusi dilakukan, download template — template sudah berisi daftar OKR Individu semua anggota. Isi kolom Progress, lalu upload kembali.</p>
       </div>
       <div className="p-4 flex flex-wrap gap-2 items-center">
         <button
@@ -678,10 +679,21 @@ function ProgressExcel({ leadId, quarterId }: { leadId: string; quarterId: strin
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function DistribusiAnggota({ initialMembers, objectives, leadId, quarterId }: Props) {
+export default function DistribusiAnggota({ initialMembers, objectives, leadId, quarterId, leadDivision }: Props) {
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [newName, setNewName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [employees, setEmployees] = useState<{ id: string; name: string; position: string | null }[]>([]);
+
+  // Load active employees for this division to use as picker
+  useEffect(() => {
+    const params = new URLSearchParams({ isActive: "true" });
+    if (leadDivision) params.set("division", leadDivision);
+    fetch(`/api/employees?${params}`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((d) => setEmployees(Array.isArray(d) ? d : []))
+      .catch(() => {});
+  }, [leadDivision]);
 
   async function addMember() {
     const name = newName.trim();
@@ -821,24 +833,54 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
       <ProgressExcel leadId={leadId} quarterId={quarterId} />
 
       {/* Add member */}
-      <div className="flex gap-2">
-        <input
-          className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white transition"
-          placeholder="👤 Nama anggota (tidak perlu punya akun)"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") addMember(); }}
-        />
-        <button
-          onClick={addMember}
-          disabled={saving || !newName.trim()}
-          className="flex items-center gap-2 bg-amber-400 text-gray-900 font-bold text-sm px-5 py-2.5 rounded-xl
-            shadow-[0_4px_0_#d97706] hover:shadow-[0_2px_0_#d97706] hover:translate-y-0.5
-            active:shadow-[0_1px_0_#d97706] active:translate-y-[3px]
-            disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 transition-all duration-75"
-        >
-          ➕ Tambah
-        </button>
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">➕ Tambah Anggota</p>
+
+        {/* Pick from employee list (if available) */}
+        {employees.length > 0 && (
+          <div className="flex gap-2">
+            <select
+              className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white transition"
+              value=""
+              onChange={(e) => {
+                const emp = employees.find((x) => x.id === e.target.value);
+                if (emp) setNewName(emp.name);
+              }}
+            >
+              <option value="">🔍 Pilih dari daftar karyawan{leadDivision ? ` (${leadDivision})` : ""}...</option>
+              {employees
+                .filter((e) => !members.some((m) => m.name.toLowerCase() === e.name.toLowerCase()))
+                .map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}{e.position ? ` — ${e.position}` : ""}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <input
+            className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white transition"
+            placeholder={employees.length > 0 ? "Atau ketik nama baru..." : "👤 Nama anggota (tidak perlu punya akun)"}
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") addMember(); }}
+          />
+          <button
+            onClick={addMember}
+            disabled={saving || !newName.trim()}
+            className="flex items-center gap-2 bg-amber-400 text-gray-900 font-bold text-sm px-5 py-2.5 rounded-xl
+              shadow-[0_4px_0_#d97706] hover:shadow-[0_2px_0_#d97706] hover:translate-y-0.5
+              active:shadow-[0_1px_0_#d97706] active:translate-y-[3px]
+              disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 transition-all duration-75"
+          >
+            ➕ Tambah
+          </button>
+        </div>
+        {employees.length === 0 && (
+          <p className="text-xs text-slate-400">💡 Daftar karyawan kosong. Admin bisa menambahkan di Admin → Karyawan.</p>
+        )}
       </div>
 
       {members.length === 0 && (

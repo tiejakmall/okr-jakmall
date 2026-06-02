@@ -21,6 +21,7 @@ const adminNav = [
 const adminOnlyNav = [
   { href: "/admin/quarters", label: "Quarter", emoji: "⏱️" },
   { href: "/admin/users", label: "Pengguna", emoji: "👥" },
+  { href: "/admin/employees", label: "Karyawan", emoji: "🧑‍💼" },
 ];
 
 export default function Sidebar({
