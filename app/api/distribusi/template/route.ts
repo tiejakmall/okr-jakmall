@@ -28,6 +28,24 @@ export async function GET(req: Request) {
     select: { id: true, name: true },
   });
 
+  // Fetch existing assignment weights to pre-fill columns C and G
+  const objIds = objectives.map((o) => o.id);
+  const memberIds = members.map((m) => m.id);
+  const existingAssignments = objIds.length > 0 && memberIds.length > 0
+    ? await prisma.objectiveAssignment.findMany({
+        where: { memberId: { in: memberIds }, objectiveId: { in: objIds } },
+        include: { krAssignments: { select: { keyResultId: true, weight: true } } },
+      })
+    : [];
+  const objWeightMap = new Map<string, number>(
+    existingAssignments.map((a) => [`${a.memberId}::${a.objectiveId}`, a.weight])
+  );
+  const kraWeightMap = new Map<string, number>(
+    existingAssignments.flatMap((a) =>
+      a.krAssignments.map((kra) => [`${a.memberId}::${a.objectiveId}::${kra.keyResultId}`, kra.weight])
+    )
+  );
+
   const wb = new ExcelJS.Workbook();
   wb.creator = "OKR App";
 
@@ -113,56 +131,59 @@ export async function GET(req: Request) {
   // Note row 2
   sheet.mergeCells("A2:G2");
   const noteCell = sheet.getCell("A2");
-  noteCell.value = "ℹ️  Kolom B & D sudah diisi dari data OKR. Isi kolom A, C, E (opsional), G. Kosongkan Target Individu jika sama dengan target divisi.";
+  noteCell.value = "ℹ️  Kolom B, C, D, F sudah diisi dari data OKR. Kolom A wajib diisi. Kolom E & G wajib diisi. Kosongkan Target Individu (E) jika sama dengan target divisi.";
   noteCell.font = { name: "Arial", italic: true, size: 10, color: { argb: "FF64748B" } };
   noteCell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF8FAFC" } };
   noteCell.alignment = { vertical: "middle" };
   sheet.getRow(2).height = 22;
 
-  // Pre-fill data rows
+  // Pre-fill data rows — grouped by member → objective → KR for clean import carry-forward
   let rowIdx = 3;
-  const PREFILL_BG = "FFEFF6FF"; // light blue tint for pre-filled cells
-  const INPUT_BG   = "FFFFFBEB"; // light amber for cells to fill
+  const PREFILL_BG = "FFEFF6FF"; // light blue — pre-filled from DB, do not change
+  const INPUT_BG   = "FFFFFBEB"; // light amber — cells user fills in
+
+  const memberList = members.length > 0 ? members : [{ id: "", name: "" }];
 
   if (objectives.length > 0) {
-    for (const obj of objectives) {
-      for (const kr of obj.keyResults) {
-        // One row per member per KR
-        const memberList = members.length > 0 ? members : [{ id: "", name: "" }];
+    for (const member of memberList) {
+      for (const obj of objectives) {
+        const existingObjWeight = member.id ? (objWeightMap.get(`${member.id}::${obj.id}`) ?? null) : null;
+        let firstKrRow = true;
 
-        for (const member of memberList) {
+        for (const kr of obj.keyResults) {
           const dataRow = sheet.getRow(rowIdx);
           dataRow.height = 20;
 
-          // A: Member name — always filled so import never loses track
+          // A: Member name (mandatory — always filled so import never loses track)
           const cellA = dataRow.getCell(1);
           cellA.value = member.name || null;
           cellA.font = { name: "Arial", size: 10, bold: true };
           cellA.fill = { type: "pattern", pattern: "solid", fgColor: { argb: INPUT_BG } };
           cellA.alignment = { vertical: "middle" };
 
-          // B: Objective — always filled so import can match
+          // B: Objective — pre-filled, do not change (used for matching)
           const cellB = dataRow.getCell(2);
           cellB.value = obj.title;
           cellB.font = { name: "Arial", size: 10, color: { argb: "FF374151" } };
           cellB.fill = { type: "pattern", pattern: "solid", fgColor: { argb: PREFILL_BG } };
           cellB.alignment = { vertical: "middle", wrapText: false };
 
-          // C: Bobot Objective (editable per member)
+          // C: Bobot Objective — pre-filled from existing assignment; only on first KR row per obj-member
           const cellC = dataRow.getCell(3);
-          cellC.value = null;
-          cellC.fill = { type: "pattern", pattern: "solid", fgColor: { argb: INPUT_BG } };
+          cellC.value = firstKrRow ? existingObjWeight : null;
+          cellC.fill = { type: "pattern", pattern: "solid", fgColor: { argb: firstKrRow ? INPUT_BG : "FFFAFAFA" } };
           cellC.font = { name: "Arial", size: 10 };
           cellC.alignment = { vertical: "middle", horizontal: "center" };
+          if (!firstKrRow) cellC.font = { ...cellC.font, color: { argb: "FFCCCCCC" } };
 
-          // D: KR title — always filled
+          // D: KR title — pre-filled, do not change (used for matching)
           const cellD = dataRow.getCell(4);
           cellD.value = kr.title;
           cellD.font = { name: "Arial", size: 10, color: { argb: "FF374151" } };
           cellD.fill = { type: "pattern", pattern: "solid", fgColor: { argb: PREFILL_BG } };
           cellD.alignment = { vertical: "middle", wrapText: false };
 
-          // E: Target individu (editable, leave blank = use division target)
+          // E: Target individu — optional, blank = use division target
           const cellE = dataRow.getCell(5);
           cellE.value = null;
           cellE.fill = { type: "pattern", pattern: "solid", fgColor: { argb: INPUT_BG } };
@@ -170,26 +191,30 @@ export async function GET(req: Request) {
           cellE.alignment = { vertical: "middle", horizontal: "center" };
           cellE.note = `Target divisi: ${kr.target} ${kr.unit}\nKosongkan jika sama.`;
 
-          // F: Unit (read-only, for reference)
+          // F: Unit — pre-filled for reference, import ignores this column
           const cellF = dataRow.getCell(6);
           cellF.value = kr.unit;
           cellF.font = { name: "Arial", size: 10, color: { argb: "FF94A3B8" } };
           cellF.fill = { type: "pattern", pattern: "solid", fgColor: { argb: PREFILL_BG } };
           cellF.alignment = { vertical: "middle", horizontal: "center" };
 
-          // G: Bobot KR (editable)
+          // G: Bobot KR — pre-filled from existing assignment
+          const existingKraWeight = member.id
+            ? (kraWeightMap.get(`${member.id}::${obj.id}::${kr.id}`) ?? null)
+            : null;
           const cellG = dataRow.getCell(7);
-          cellG.value = null;
+          cellG.value = existingKraWeight;
           cellG.fill = { type: "pattern", pattern: "solid", fgColor: { argb: INPUT_BG } };
           cellG.font = { name: "Arial", size: 10 };
           cellG.alignment = { vertical: "middle", horizontal: "center" };
 
+          firstKrRow = false;
           rowIdx++;
         }
       }
     }
   } else {
-    // No objectives yet — show empty template
+    // No objectives yet — show empty template rows
     for (let i = 3; i <= 52; i++) {
       const row = sheet.getRow(i);
       row.height = 20;
