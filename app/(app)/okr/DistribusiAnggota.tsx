@@ -682,15 +682,28 @@ function ProgressExcel({ leadId, quarterId }: { leadId: string; quarterId: strin
 export default function DistribusiAnggota({ initialMembers, objectives, leadId, quarterId, leadDivision }: Props) {
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [newName, setNewName] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [saving, setSaving] = useState(false);
   const [employees, setEmployees] = useState<{ id: string; name: string; position: string | null }[]>([]);
+  const comboRef = useRef<HTMLDivElement>(null);
 
-  // Load all active employees for picker (no division filter to avoid mismatch)
+  // Load all active employees for picker
   useEffect(() => {
     fetch("/api/employees?isActive=true")
       .then((r) => r.ok ? r.json() : [])
       .then((d) => setEmployees(Array.isArray(d) ? d : []))
       .catch(() => {});
+  }, []);
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (comboRef.current && !comboRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
   async function addMember() {
@@ -831,42 +844,55 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
       <ProgressExcel leadId={leadId} quarterId={quarterId} />
 
       {/* Add member */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">➕ Tambah Anggota</p>
-
-        {/* Pick from employee list (if available) */}
-        {employees.length > 0 && (
-          <div className="flex gap-2">
-            <select
-              className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white transition"
-              value=""
-              onChange={(e) => {
-                const emp = employees.find((x) => x.id === e.target.value);
-                if (emp) setNewName(emp.name);
-              }}
-            >
-              <option value="">🔍 Pilih dari daftar karyawan...</option>
-              {employees
-                .filter((e) => !members.some((m) => m.name.toLowerCase() === e.name.toLowerCase()))
-                .map((e) => (
-                  <option key={e.id} value={e.id}>
-                    {e.name}{e.position ? ` — ${e.position}` : ""}
-                  </option>
-                ))}
-            </select>
-          </div>
-        )}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">➕ Tambah Anggota</p>
 
         <div className="flex gap-2">
-          <input
-            className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white transition"
-            placeholder={employees.length > 0 ? "Atau ketik nama baru..." : "👤 Nama anggota (tidak perlu punya akun)"}
-            value={newName}
-            onChange={(e) => setNewName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") addMember(); }}
-          />
+          {/* Combobox */}
+          <div className="relative flex-1" ref={comboRef}>
+            <input
+              className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white transition"
+              placeholder="🔍 Cari atau ketik nama anggota..."
+              value={newName}
+              onChange={(e) => { setNewName(e.target.value); setShowSuggestions(true); }}
+              onFocus={() => setShowSuggestions(true)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") { setShowSuggestions(false); addMember(); }
+                if (e.key === "Escape") setShowSuggestions(false);
+              }}
+            />
+            {showSuggestions && (() => {
+              const suggestions = employees
+                .filter((e) => !members.some((m) => m.name.toLowerCase() === e.name.toLowerCase()))
+                .filter((e) =>
+                  !newName.trim() ||
+                  e.name.toLowerCase().includes(newName.toLowerCase()) ||
+                  (e.position ?? "").toLowerCase().includes(newName.toLowerCase())
+                );
+              return suggestions.length > 0 ? (
+                <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden max-h-52 overflow-y-auto">
+                  {suggestions.map((emp) => (
+                    <button
+                      key={emp.id}
+                      type="button"
+                      className="w-full text-left px-4 py-2.5 text-sm hover:bg-amber-50 flex items-center justify-between gap-3 border-b border-slate-50 last:border-0 transition-colors"
+                      onMouseDown={(e) => {
+                        e.preventDefault();
+                        setNewName(emp.name);
+                        setShowSuggestions(false);
+                      }}
+                    >
+                      <span className="font-medium text-slate-800">{emp.name}</span>
+                      {emp.position && <span className="text-xs text-slate-400 flex-shrink-0">{emp.position}</span>}
+                    </button>
+                  ))}
+                </div>
+              ) : null;
+            })()}
+          </div>
+
           <button
-            onClick={addMember}
+            onClick={() => { setShowSuggestions(false); addMember(); }}
             disabled={saving || !newName.trim()}
             className="flex items-center gap-2 bg-amber-400 text-gray-900 font-bold text-sm px-5 py-2.5 rounded-xl
               shadow-[0_4px_0_#d97706] hover:shadow-[0_2px_0_#d97706] hover:translate-y-0.5
@@ -876,8 +902,9 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
             ➕ Tambah
           </button>
         </div>
+
         {employees.length === 0 && (
-          <p className="text-xs text-slate-400">💡 Daftar karyawan kosong. Admin bisa menambahkan di Admin → Karyawan.</p>
+          <p className="text-xs text-slate-400 mt-2">💡 Daftar karyawan kosong. Admin bisa menambahkan di Admin → Karyawan.</p>
         )}
       </div>
 
