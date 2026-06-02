@@ -591,7 +591,7 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
         )}
 
         {/* Objective cards */}
-        {objectives.map((obj) => {
+        {objectives.map((obj, objIdx) => {
           const isLocked = obj.status === "SUBMITTED";
           const isDraft = obj.status === "DRAFT";
           const krTotalWeight = obj.keyResults.reduce((s, kr) => s + Number(kr.weight), 0);
@@ -630,6 +630,10 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
                 >
                   {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>
+
+                <span className="w-6 h-6 rounded-full bg-amber-400 text-gray-900 text-xs font-bold flex items-center justify-center flex-shrink-0 shadow-[0_2px_0_#d97706]">
+                  {objIdx + 1}
+                </span>
 
                 <input
                   className="flex-1 font-semibold text-slate-800 text-sm border-b border-transparent hover:border-slate-200 focus:border-amber-400 focus:outline-none bg-transparent py-0.5 disabled:cursor-default disabled:text-slate-600"
@@ -723,11 +727,14 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
                   )}
 
                   <div className="space-y-2">
-                    {obj.keyResults.map((kr) => {
+                    {obj.keyResults.map((kr, krIdx) => {
                       const pct = calcKRAchievement(kr);
                       return (
                         <div key={kr.id} className="border border-slate-100 rounded-xl p-4 bg-slate-50/50">
                           <div className="flex items-center gap-2 mb-3">
+                            <span className="text-xs font-bold text-slate-400 bg-slate-100 rounded-md px-1.5 py-0.5 flex-shrink-0 min-w-[2rem] text-center">
+                              {objIdx + 1}.{krIdx + 1}
+                            </span>
                             <input
                               className="flex-1 text-sm font-medium text-slate-800 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-amber-400 focus:outline-none disabled:cursor-default"
                               value={kr.title}
