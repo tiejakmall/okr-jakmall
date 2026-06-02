@@ -685,15 +685,13 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
   const [saving, setSaving] = useState(false);
   const [employees, setEmployees] = useState<{ id: string; name: string; position: string | null }[]>([]);
 
-  // Load active employees for this division to use as picker
+  // Load all active employees for picker (no division filter to avoid mismatch)
   useEffect(() => {
-    const params = new URLSearchParams({ isActive: "true" });
-    if (leadDivision) params.set("division", leadDivision);
-    fetch(`/api/employees?${params}`)
+    fetch("/api/employees?isActive=true")
       .then((r) => r.ok ? r.json() : [])
       .then((d) => setEmployees(Array.isArray(d) ? d : []))
       .catch(() => {});
-  }, [leadDivision]);
+  }, []);
 
   async function addMember() {
     const name = newName.trim();
@@ -847,7 +845,7 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
                 if (emp) setNewName(emp.name);
               }}
             >
-              <option value="">🔍 Pilih dari daftar karyawan{leadDivision ? ` (${leadDivision})` : ""}...</option>
+              <option value="">🔍 Pilih dari daftar karyawan...</option>
               {employees
                 .filter((e) => !members.some((m) => m.name.toLowerCase() === e.name.toLowerCase()))
                 .map((e) => (
