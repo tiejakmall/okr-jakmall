@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { Trash2, ChevronDown, ChevronUp, X } from "lucide-react";
 
 type KRAssignment = {
   id: string;
@@ -39,11 +39,17 @@ type Objective = {
   keyResults: KeyResult[];
 };
 
+type Quarter = {
+  id: string;
+  name: string;
+};
+
 type Props = {
   initialMembers: Member[];
   objectives: Objective[];
   leadId: string;
   quarterId: string;
+  allQuarters: Quarter[];
   leadDivision?: string;
 };
 
@@ -600,6 +606,142 @@ function DistribusiExcel({ leadId, objectives, quarterId }: { leadId: string; ob
   );
 }
 
+// ─── Copy from Quarter Modal ──────────────────────────────────────────────────
+
+type MemberPreview = { name: string; objectiveCount: number; krCount: number; objectives: string[] };
+
+function CopyFromQuarterModal({
+  allQuarters, currentQuarterId, leadId,
+  onCopied, onClose,
+}: {
+  allQuarters: Quarter[]; currentQuarterId: string; leadId: string;
+  onCopied: () => void; onClose: () => void;
+}) {
+  const otherQuarters = allQuarters.filter((q) => q.id !== currentQuarterId);
+  const [sourceId, setSourceId] = useState(otherQuarters[0]?.id ?? "");
+  const [preview, setPreview] = useState<MemberPreview[]>([]);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+  const [copying, setCopying] = useState(false);
+  const [result, setResult] = useState<{ type: "success" | "error"; message: string; errors?: string[] } | null>(null);
+
+  useEffect(() => {
+    if (sourceId) loadPreview(sourceId);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function loadPreview(qId: string) {
+    setSourceId(qId);
+    setPreview([]);
+    setResult(null);
+    if (!qId) return;
+    setLoadingPreview(true);
+    const res = await fetch(`/api/distribusi/copy?fromQuarterId=${qId}&leadId=${encodeURIComponent(leadId)}`);
+    const data = await res.json();
+    setPreview(Array.isArray(data.members) ? data.members : []);
+    setLoadingPreview(false);
+  }
+
+  async function doCopy() {
+    if (!sourceId) return;
+    setCopying(true);
+    setResult(null);
+    const res = await fetch("/api/distribusi/copy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fromQuarterId: sourceId, toQuarterId: currentQuarterId, leadId }),
+    });
+    const data = await res.json();
+    if (res.ok && data.success) {
+      setResult({ type: "success", message: data.message, errors: data.errors });
+      setTimeout(() => { onCopied(); onClose(); }, 1200);
+    } else {
+      setResult({ type: "error", message: data.error ?? "Gagal menyalin.", errors: data.errors });
+    }
+    setCopying(false);
+  }
+
+  const btnPrimary = "flex items-center gap-2 bg-amber-400 text-gray-900 font-bold text-sm px-4 py-2 rounded-xl shadow-[0_4px_0_#d97706] hover:shadow-[0_2px_0_#d97706] hover:translate-y-0.5 active:shadow-[0_1px_0_#d97706] active:translate-y-[3px] disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 transition-all duration-75";
+  const btnSecondary = "flex items-center gap-2 bg-white border border-slate-200 text-slate-700 font-semibold text-sm px-4 py-2 rounded-xl shadow-[0_4px_0_#e2e8f0] hover:shadow-[0_2px_0_#e2e8f0] hover:translate-y-0.5 active:shadow-[0_1px_0_#e2e8f0] active:translate-y-[3px] transition-all duration-75";
+
+  return (
+    <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+          <h3 className="font-bold text-slate-800">📋 Salin Distribusi dari Quarter Lain</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition"><X size={18} /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Target info */}
+          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-xs text-amber-700">
+            <span>📥</span>
+            <span>Distribusi akan disalin ke quarter ini: <strong>{allQuarters.find((q) => q.id === currentQuarterId)?.name}</strong></span>
+          </div>
+
+          {otherQuarters.length === 0 ? (
+            <p className="text-slate-500 text-sm text-center py-8">Tidak ada quarter lain yang tersedia.</p>
+          ) : (
+            <>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Salin dari Quarter</label>
+                <select value={sourceId} onChange={(e) => loadPreview(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white">
+                  <option value="">-- Pilih Quarter --</option>
+                  {otherQuarters.map((q) => <option key={q.id} value={q.id}>{q.name}</option>)}
+                </select>
+              </div>
+
+              {loadingPreview && <p className="text-slate-400 text-sm text-center py-4">⏳ Memuat preview...</p>}
+
+              {!loadingPreview && sourceId && preview.length === 0 && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-500 text-center">
+                  Belum ada distribusi di quarter ini.
+                </div>
+              )}
+
+              {!loadingPreview && preview.length > 0 && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 mb-2">{preview.length} anggota akan disalin:</p>
+                  <div className="space-y-2 max-h-52 overflow-y-auto">
+                    {preview.map((m) => (
+                      <div key={m.name} className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold text-slate-700">{m.name}</span>
+                          <span className="text-xs text-slate-400">{m.objectiveCount} obj · {m.krCount} KR</span>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5 truncate">{m.objectives.join(", ")}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-3">
+                    💡 Bobot & target akan disalin. Progress yang sudah diisi di quarter ini <strong>tidak akan terhapus</strong>.
+                  </p>
+                </div>
+              )}
+
+              {result && (
+                <div className={`rounded-xl px-4 py-3 text-xs ${result.type === "success" ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"}`}>
+                  <p className="font-semibold">{result.type === "success" ? "✅" : "❌"} {result.message}</p>
+                  {result.errors?.map((e, i) => <p key={i} className="mt-0.5">{e}</p>)}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100">
+          <button onClick={onClose} className={btnSecondary}>Batal</button>
+          <button onClick={doCopy} disabled={copying || preview.length === 0 || !!result}
+            className={btnPrimary}>
+            {copying ? "⏳ Menyalin..." : `📋 Salin ${preview.length > 0 ? `(${preview.length} anggota)` : ""}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Progress Excel Import ────────────────────────────────────────────────────
 
 type ProgressImportResult = { type: "success" | "error"; message: string; errors?: string[] };
@@ -679,11 +821,12 @@ function ProgressExcel({ leadId, quarterId }: { leadId: string; quarterId: strin
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function DistribusiAnggota({ initialMembers, objectives, leadId, quarterId, leadDivision }: Props) {
+export default function DistribusiAnggota({ initialMembers, objectives, leadId, quarterId, allQuarters, leadDivision }: Props) {
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [newName, setNewName] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showCopyModal, setShowCopyModal] = useState(false);
   const [employees, setEmployees] = useState<{ id: string; name: string; position: string | null }[]>([]);
   const comboRef = useRef<HTMLDivElement>(null);
 
@@ -837,8 +980,30 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
 
   return (
     <div className="space-y-5">
+      {showCopyModal && (
+        <CopyFromQuarterModal
+          allQuarters={allQuarters}
+          currentQuarterId={quarterId}
+          leadId={leadId}
+          onCopied={() => window.location.reload()}
+          onClose={() => setShowCopyModal(false)}
+        />
+      )}
+
       {/* Distribusi Excel import/export */}
       <DistribusiExcel leadId={leadId} objectives={objectives} quarterId={quarterId} />
+
+      {/* Copy from quarter */}
+      {allQuarters.length > 1 && (
+        <button
+          onClick={() => setShowCopyModal(true)}
+          className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-600 font-semibold text-sm px-4 py-3 rounded-2xl
+            shadow-[0_4px_0_#e2e8f0] hover:shadow-[0_2px_0_#e2e8f0] hover:translate-y-0.5
+            active:shadow-[0_1px_0_#e2e8f0] active:translate-y-[3px] transition-all duration-75"
+        >
+          📋 Salin Distribusi dari Quarter Lain
+        </button>
+      )}
 
       {/* Progress Excel import */}
       <ProgressExcel leadId={leadId} quarterId={quarterId} />
