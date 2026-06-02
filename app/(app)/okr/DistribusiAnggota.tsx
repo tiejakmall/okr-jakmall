@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect } from "react";
-import { Trash2, ChevronDown, ChevronUp, X } from "lucide-react";
+import { Trash2, ChevronDown, ChevronUp, X, CheckSquare, Square } from "lucide-react";
 
 type KRAssignment = {
   id: string;
@@ -620,6 +620,8 @@ function CopyFromQuarterModal({
   const otherQuarters = allQuarters.filter((q) => q.id !== currentQuarterId);
   const [sourceId, setSourceId] = useState(otherQuarters[0]?.id ?? "");
   const [preview, setPreview] = useState<MemberPreview[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [copying, setCopying] = useState(false);
   const [result, setResult] = useState<{ type: "success" | "error"; message: string; errors?: string[] } | null>(null);
@@ -632,23 +634,53 @@ function CopyFromQuarterModal({
   async function loadPreview(qId: string) {
     setSourceId(qId);
     setPreview([]);
+    setSelected(new Set());
+    setExpanded(new Set());
     setResult(null);
     if (!qId) return;
     setLoadingPreview(true);
     const res = await fetch(`/api/distribusi/copy?fromQuarterId=${qId}&leadId=${encodeURIComponent(leadId)}`);
     const data = await res.json();
-    setPreview(Array.isArray(data.members) ? data.members : []);
+    const members: MemberPreview[] = Array.isArray(data.members) ? data.members : [];
+    setPreview(members);
+    setSelected(new Set(members.map((m) => m.name))); // default: all selected
     setLoadingPreview(false);
   }
 
+  function toggleMember(name: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (selected.size === preview.length) setSelected(new Set());
+    else setSelected(new Set(preview.map((m) => m.name)));
+  }
+
+  function toggleExpand(name: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name); else next.add(name);
+      return next;
+    });
+  }
+
   async function doCopy() {
-    if (!sourceId) return;
+    if (!sourceId || selected.size === 0) return;
     setCopying(true);
     setResult(null);
     const res = await fetch("/api/distribusi/copy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fromQuarterId: sourceId, toQuarterId: currentQuarterId, leadId }),
+      body: JSON.stringify({
+        fromQuarterId: sourceId,
+        toQuarterId: currentQuarterId,
+        leadId,
+        selectedMemberNames: [...selected],
+      }),
     });
     const data = await res.json();
     if (res.ok && data.success) {
@@ -676,13 +708,14 @@ function CopyFromQuarterModal({
           {/* Target info */}
           <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-xs text-amber-700">
             <span>📥</span>
-            <span>Distribusi akan disalin ke quarter ini: <strong>{allQuarters.find((q) => q.id === currentQuarterId)?.name}</strong></span>
+            <span>Distribusi akan disalin ke: <strong>{allQuarters.find((q) => q.id === currentQuarterId)?.name}</strong></span>
           </div>
 
           {otherQuarters.length === 0 ? (
             <p className="text-slate-500 text-sm text-center py-8">Tidak ada quarter lain yang tersedia.</p>
           ) : (
             <>
+              {/* Quarter selector */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1.5">Salin dari Quarter</label>
                 <select value={sourceId} onChange={(e) => loadPreview(e.target.value)}
@@ -692,7 +725,7 @@ function CopyFromQuarterModal({
                 </select>
               </div>
 
-              {loadingPreview && <p className="text-slate-400 text-sm text-center py-4">⏳ Memuat preview...</p>}
+              {loadingPreview && <p className="text-slate-400 text-sm text-center py-4">⏳ Memuat data...</p>}
 
               {!loadingPreview && sourceId && preview.length === 0 && (
                 <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-500 text-center">
@@ -700,22 +733,59 @@ function CopyFromQuarterModal({
                 </div>
               )}
 
+              {/* Member checklist */}
               {!loadingPreview && preview.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-slate-500 mb-2">{preview.length} anggota akan disalin:</p>
-                  <div className="space-y-2 max-h-52 overflow-y-auto">
-                    {preview.map((m) => (
-                      <div key={m.name} className="bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5">
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="text-sm font-semibold text-slate-700">{m.name}</span>
-                          <span className="text-xs text-slate-400">{m.objectiveCount} obj · {m.krCount} KR</span>
-                        </div>
-                        <p className="text-xs text-slate-400 mt-0.5 truncate">{m.objectives.join(", ")}</p>
-                      </div>
-                    ))}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-slate-500">
+                      {selected.size}/{preview.length} anggota dipilih
+                    </span>
+                    <button onClick={toggleAll} className="text-xs text-amber-600 font-bold hover:text-amber-700 transition">
+                      {selected.size === preview.length ? "Batal semua" : "Pilih semua"}
+                    </button>
                   </div>
+
+                  <div className="space-y-2">
+                    {preview.map((m) => {
+                      const isSel = selected.has(m.name);
+                      const isExp = expanded.has(m.name);
+                      return (
+                        <div key={m.name} className={`rounded-xl border transition-colors ${isSel ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}>
+                          <div className="flex items-center gap-2.5 px-3 py-2.5">
+                            <button onClick={() => toggleMember(m.name)} className="flex-shrink-0">
+                              {isSel
+                                ? <CheckSquare size={16} className="text-amber-500" />
+                                : <Square size={16} className="text-slate-300" />}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-slate-700">{m.name}</p>
+                              <p className="text-xs text-slate-400 mt-0.5">
+                                {m.objectiveCount} objective · {m.krCount} KR
+                              </p>
+                            </div>
+                            <button
+                              onClick={() => toggleExpand(m.name)}
+                              className="flex-shrink-0 flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100 transition"
+                            >
+                              {isExp ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                            </button>
+                          </div>
+                          {isExp && (
+                            <div className="border-t border-slate-100 px-4 pb-3 pt-2 space-y-1">
+                              {m.objectives.map((obj, i) => (
+                                <p key={i} className="text-xs text-slate-500 flex items-center gap-1.5">
+                                  <span className="text-slate-300">•</span>{obj}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
                   <p className="text-xs text-slate-400 mt-3">
-                    💡 Bobot & target akan disalin. Progress yang sudah diisi di quarter ini <strong>tidak akan terhapus</strong>.
+                    💡 Bobot & target disalin. Progress yang sudah diisi <strong>tidak terhapus</strong>.
                   </p>
                 </div>
               )}
@@ -732,9 +802,8 @@ function CopyFromQuarterModal({
 
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100">
           <button onClick={onClose} className={btnSecondary}>Batal</button>
-          <button onClick={doCopy} disabled={copying || preview.length === 0 || !!result}
-            className={btnPrimary}>
-            {copying ? "⏳ Menyalin..." : `📋 Salin ${preview.length > 0 ? `(${preview.length} anggota)` : ""}`}
+          <button onClick={doCopy} disabled={copying || selected.size === 0 || !!result} className={btnPrimary}>
+            {copying ? "⏳ Menyalin..." : `📋 Salin${selected.size > 0 ? ` (${selected.size} anggota)` : ""}`}
           </button>
         </div>
       </div>

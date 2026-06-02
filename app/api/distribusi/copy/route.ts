@@ -54,14 +54,18 @@ export async function POST(req: Request) {
   if (!session || session.user.role === "MEMBER") return Response.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { fromQuarterId, toQuarterId } = body;
+  const { fromQuarterId, toQuarterId, selectedMemberNames } = body;
   const leadId: string = body.leadId ?? session.user.id;
 
   if (!fromQuarterId || !toQuarterId) return Response.json({ error: "fromQuarterId dan toQuarterId wajib diisi." }, { status: 400 });
 
-  // Fetch source assignments
+  // Fetch source assignments — optionally filtered to selected member names
+  const memberNameFilter = Array.isArray(selectedMemberNames) && selectedMemberNames.length > 0
+    ? { name: { in: selectedMemberNames as string[] } }
+    : {};
+
   const sourceMembers = await prisma.teamMember.findMany({
-    where: { leadId },
+    where: { leadId, ...memberNameFilter },
     include: {
       assignments: {
         where: { objective: { quarterId: fromQuarterId } },
