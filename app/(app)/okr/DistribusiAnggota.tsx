@@ -608,7 +608,12 @@ function DistribusiExcel({ leadId, objectives, quarterId }: { leadId: string; ob
 
 // ─── Copy from Quarter Modal ──────────────────────────────────────────────────
 
-type MemberPreview = { name: string; objectiveCount: number; krCount: number; objectives: string[] };
+type KRPreview  = { title: string; unit: string; weight: number; target: number | null };
+type ObjPreview = { title: string; weight: number; krs: KRPreview[] };
+type MemberPreview = { name: string; objectives: ObjPreview[] };
+
+// krKey format used for selection: "objectiveTitle::krTitle"
+function krKey(objTitle: string, krTitle: string) { return `${objTitle}::${krTitle}`; }
 
 function CopyFromQuarterModal({
   allQuarters, currentQuarterId, leadId,
@@ -618,69 +623,93 @@ function CopyFromQuarterModal({
   onCopied: () => void; onClose: () => void;
 }) {
   const otherQuarters = allQuarters.filter((q) => q.id !== currentQuarterId);
-  const [sourceId, setSourceId] = useState(otherQuarters[0]?.id ?? "");
-  const [preview, setPreview] = useState<MemberPreview[]>([]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const [loadingPreview, setLoadingPreview] = useState(false);
-  const [copying, setCopying] = useState(false);
-  const [result, setResult] = useState<{ type: "success" | "error"; message: string; errors?: string[] } | null>(null);
+  const [sourceId, setSourceId]       = useState(otherQuarters[0]?.id ?? "");
+  const [preview, setPreview]         = useState<MemberPreview[]>([]);
+  // krSel: memberName → Set<"objTitle::krTitle">
+  const [krSel, setKrSel]             = useState<Map<string, Set<string>>>(new Map());
+  const [expanded, setExpanded]       = useState<Set<string>>(new Set());
+  const [loadingPreview, setLoading]  = useState(false);
+  const [copying, setCopying]         = useState(false);
+  const [result, setResult]           = useState<{ type: "success"|"error"; message: string; errors?: string[] }|null>(null);
 
-  useEffect(() => {
-    if (sourceId) loadPreview(sourceId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(() => { if (sourceId) loadPreview(sourceId); /* eslint-disable-next-line */ }, []);
 
   async function loadPreview(qId: string) {
-    setSourceId(qId);
-    setPreview([]);
-    setSelected(new Set());
-    setExpanded(new Set());
-    setResult(null);
+    setSourceId(qId); setPreview([]); setKrSel(new Map()); setExpanded(new Set()); setResult(null);
     if (!qId) return;
-    setLoadingPreview(true);
-    const res = await fetch(`/api/distribusi/copy?fromQuarterId=${qId}&leadId=${encodeURIComponent(leadId)}`);
-    const data = await res.json();
+    setLoading(true);
+    const data = await fetch(`/api/distribusi/copy?fromQuarterId=${qId}&leadId=${encodeURIComponent(leadId)}`).then((r) => r.json());
     const members: MemberPreview[] = Array.isArray(data.members) ? data.members : [];
     setPreview(members);
-    setSelected(new Set(members.map((m) => m.name))); // default: all selected
-    setLoadingPreview(false);
+    // default: all KRs selected
+    const init = new Map<string, Set<string>>();
+    for (const m of members) {
+      init.set(m.name, new Set(m.objectives.flatMap((o) => o.krs.map((kr) => krKey(o.title, kr.title)))));
+    }
+    setKrSel(init);
+    setLoading(false);
   }
 
-  function toggleMember(name: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name); else next.add(name);
+  // ── helpers ──────────────────────────────────────────────────────────────────
+  const allKrKeys = (m: MemberPreview) => m.objectives.flatMap((o) => o.krs.map((kr) => krKey(o.title, kr.title)));
+  const selCount  = (m: MemberPreview) => krSel.get(m.name)?.size ?? 0;
+  const totalSel  = preview.reduce((s, m) => s + selCount(m), 0);
+  const totalAll  = preview.reduce((s, m) => s + allKrKeys(m).length, 0);
+
+  function toggleKR(memberName: string, key: string) {
+    setKrSel((prev) => {
+      const next = new Map(prev);
+      const set  = new Set(prev.get(memberName) ?? []);
+      if (set.has(key)) set.delete(key); else set.add(key);
+      next.set(memberName, set);
+      return next;
+    });
+  }
+
+  function toggleMember(m: MemberPreview) {
+    setKrSel((prev) => {
+      const next = new Map(prev);
+      next.set(m.name, selCount(m) > 0 ? new Set() : new Set(allKrKeys(m)));
+      return next;
+    });
+  }
+
+  function toggleObjectiveKRs(m: MemberPreview, obj: ObjPreview) {
+    const objKeys = obj.krs.map((kr) => krKey(obj.title, kr.title));
+    setKrSel((prev) => {
+      const next = new Map(prev);
+      const set  = new Set(prev.get(m.name) ?? []);
+      const allObjSel = objKeys.every((k) => set.has(k));
+      if (allObjSel) objKeys.forEach((k) => set.delete(k));
+      else           objKeys.forEach((k) => set.add(k));
+      next.set(m.name, set);
       return next;
     });
   }
 
   function toggleAll() {
-    if (selected.size === preview.length) setSelected(new Set());
-    else setSelected(new Set(preview.map((m) => m.name)));
+    if (totalSel > 0) {
+      setKrSel(new Map());
+    } else {
+      const init = new Map<string, Set<string>>();
+      for (const m of preview) init.set(m.name, new Set(allKrKeys(m)));
+      setKrSel(init);
+    }
   }
 
   function toggleExpand(name: string) {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name); else next.add(name);
-      return next;
-    });
+    setExpanded((prev) => { const n = new Set(prev); n.has(name) ? n.delete(name) : n.add(name); return n; });
   }
 
   async function doCopy() {
-    if (!sourceId || selected.size === 0) return;
-    setCopying(true);
-    setResult(null);
-    const res = await fetch("/api/distribusi/copy", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        fromQuarterId: sourceId,
-        toQuarterId: currentQuarterId,
-        leadId,
-        selectedMemberNames: [...selected],
-      }),
+    if (!sourceId || totalSel === 0) return;
+    setCopying(true); setResult(null);
+    const selections = preview
+      .filter((m) => selCount(m) > 0)
+      .map((m) => ({ memberName: m.name, krKeys: [...(krSel.get(m.name) ?? [])] }));
+    const res  = await fetch("/api/distribusi/copy", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fromQuarterId: sourceId, toQuarterId: currentQuarterId, leadId, selections }),
     });
     const data = await res.json();
     if (res.ok && data.success) {
@@ -692,30 +721,27 @@ function CopyFromQuarterModal({
     setCopying(false);
   }
 
-  const btnPrimary = "flex items-center gap-2 bg-amber-400 text-gray-900 font-bold text-sm px-4 py-2 rounded-xl shadow-[0_4px_0_#d97706] hover:shadow-[0_2px_0_#d97706] hover:translate-y-0.5 active:shadow-[0_1px_0_#d97706] active:translate-y-[3px] disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 transition-all duration-75";
+  const btnPrimary   = "flex items-center gap-2 bg-amber-400 text-gray-900 font-bold text-sm px-4 py-2 rounded-xl shadow-[0_4px_0_#d97706] hover:shadow-[0_2px_0_#d97706] hover:translate-y-0.5 active:shadow-[0_1px_0_#d97706] active:translate-y-[3px] disabled:opacity-50 disabled:shadow-none disabled:translate-y-0 transition-all duration-75";
   const btnSecondary = "flex items-center gap-2 bg-white border border-slate-200 text-slate-700 font-semibold text-sm px-4 py-2 rounded-xl shadow-[0_4px_0_#e2e8f0] hover:shadow-[0_2px_0_#e2e8f0] hover:translate-y-0.5 active:shadow-[0_1px_0_#e2e8f0] active:translate-y-[3px] transition-all duration-75";
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] flex flex-col">
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <h3 className="font-bold text-slate-800">📋 Salin Distribusi dari Quarter Lain</h3>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 transition"><X size={18} /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {/* Target info */}
           <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-xs text-amber-700">
             <span>📥</span>
-            <span>Distribusi akan disalin ke: <strong>{allQuarters.find((q) => q.id === currentQuarterId)?.name}</strong></span>
+            <span>Salin ke: <strong>{allQuarters.find((q) => q.id === currentQuarterId)?.name}</strong></span>
           </div>
 
           {otherQuarters.length === 0 ? (
             <p className="text-slate-500 text-sm text-center py-8">Tidak ada quarter lain yang tersedia.</p>
           ) : (
             <>
-              {/* Quarter selector */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1.5">Salin dari Quarter</label>
                 <select value={sourceId} onChange={(e) => loadPreview(e.target.value)}
@@ -726,67 +752,89 @@ function CopyFromQuarterModal({
               </div>
 
               {loadingPreview && <p className="text-slate-400 text-sm text-center py-4">⏳ Memuat data...</p>}
-
               {!loadingPreview && sourceId && preview.length === 0 && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-500 text-center">
-                  Belum ada distribusi di quarter ini.
-                </div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-500 text-center">Belum ada distribusi di quarter ini.</div>
               )}
 
-              {/* Member checklist */}
               {!loadingPreview && preview.length > 0 && (
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-semibold text-slate-500">
-                      {selected.size}/{preview.length} anggota dipilih
-                    </span>
+                    <span className="text-xs font-semibold text-slate-500">{totalSel}/{totalAll} KR dipilih</span>
                     <button onClick={toggleAll} className="text-xs text-amber-600 font-bold hover:text-amber-700 transition">
-                      {selected.size === preview.length ? "Batal semua" : "Pilih semua"}
+                      {totalSel > 0 ? "Batal semua" : "Pilih semua"}
                     </button>
                   </div>
 
                   <div className="space-y-2">
                     {preview.map((m) => {
-                      const isSel = selected.has(m.name);
-                      const isExp = expanded.has(m.name);
+                      const mSel   = selCount(m);
+                      const mTotal = allKrKeys(m).length;
+                      const isExp  = expanded.has(m.name);
+                      const memberChecked = mSel === mTotal ? "all" : mSel > 0 ? "partial" : "none";
+
                       return (
-                        <div key={m.name} className={`rounded-xl border transition-colors ${isSel ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}>
+                        <div key={m.name} className={`rounded-xl border transition-colors ${mSel > 0 ? "border-amber-300 bg-amber-50/60" : "border-slate-200 bg-white"}`}>
+                          {/* Member row */}
                           <div className="flex items-center gap-2.5 px-3 py-2.5">
-                            <button onClick={() => toggleMember(m.name)} className="flex-shrink-0">
-                              {isSel
-                                ? <CheckSquare size={16} className="text-amber-500" />
-                                : <Square size={16} className="text-slate-300" />}
+                            <button onClick={() => toggleMember(m)} className="flex-shrink-0">
+                              {memberChecked === "all"     ? <CheckSquare size={16} className="text-amber-500" />
+                               : memberChecked === "partial" ? <CheckSquare size={16} className="text-amber-300" />
+                               : <Square size={16} className="text-slate-300" />}
                             </button>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-semibold text-slate-700">{m.name}</p>
-                              <p className="text-xs text-slate-400 mt-0.5">
-                                {m.objectiveCount} objective · {m.krCount} KR
-                              </p>
+                              <p className="text-xs text-slate-400">{mSel}/{mTotal} KR dipilih</p>
                             </div>
-                            <button
-                              onClick={() => toggleExpand(m.name)}
-                              className="flex-shrink-0 flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100 transition"
-                            >
+                            <button onClick={() => toggleExpand(m.name)}
+                              className="flex-shrink-0 flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 px-2 py-1 rounded-lg hover:bg-slate-100 transition">
                               {isExp ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
                             </button>
                           </div>
+
+                          {/* Expanded: objectives + KR checkboxes */}
                           {isExp && (
-                            <div className="border-t border-slate-100 px-4 pb-3 pt-2 space-y-1">
-                              {m.objectives.map((obj, i) => (
-                                <p key={i} className="text-xs text-slate-500 flex items-center gap-1.5">
-                                  <span className="text-slate-300">•</span>{obj}
-                                </p>
-                              ))}
+                            <div className="border-t border-amber-100 divide-y divide-slate-50">
+                              {m.objectives.map((obj) => {
+                                const sel    = krSel.get(m.name) ?? new Set();
+                                const objSel = obj.krs.filter((kr) => sel.has(krKey(obj.title, kr.title))).length;
+                                const objAll = obj.krs.length;
+                                return (
+                                  <div key={obj.title} className="px-4 py-2.5">
+                                    {/* Objective header row */}
+                                    <div className="flex items-center gap-2 mb-1.5">
+                                      <button onClick={() => toggleObjectiveKRs(m, obj)} className="flex-shrink-0">
+                                        {objSel === objAll ? <CheckSquare size={14} className="text-amber-400" />
+                                         : objSel > 0      ? <CheckSquare size={14} className="text-amber-200" />
+                                         : <Square size={14} className="text-slate-300" />}
+                                      </button>
+                                      <span className="text-xs font-semibold text-slate-600 flex-1 truncate">🎯 {obj.title}</span>
+                                      <span className="text-xs text-slate-400 flex-shrink-0">bobot {obj.weight}%</span>
+                                    </div>
+                                    {/* KR checkboxes */}
+                                    <div className="space-y-1 pl-5">
+                                      {obj.krs.map((kr) => {
+                                        const key    = krKey(obj.title, kr.title);
+                                        const isSel  = (krSel.get(m.name) ?? new Set()).has(key);
+                                        return (
+                                          <button key={kr.title} onClick={() => toggleKR(m.name, key)}
+                                            className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-left transition-colors ${isSel ? "bg-amber-100 border border-amber-200" : "bg-white border border-slate-100 hover:bg-slate-50"}`}>
+                                            {isSel ? <CheckSquare size={12} className="text-amber-500 flex-shrink-0" /> : <Square size={12} className="text-slate-300 flex-shrink-0" />}
+                                            <span className="text-xs text-slate-700 flex-1 truncate">{kr.title}</span>
+                                            <span className="text-xs text-slate-400 flex-shrink-0">{kr.weight}%</span>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                );
+                              })}
                             </div>
                           )}
                         </div>
                       );
                     })}
                   </div>
-
-                  <p className="text-xs text-slate-400 mt-3">
-                    💡 Bobot & target disalin. Progress yang sudah diisi <strong>tidak terhapus</strong>.
-                  </p>
+                  <p className="text-xs text-slate-400 mt-3">💡 Bobot & target disalin. Progress yang sudah diisi <strong>tidak terhapus</strong>.</p>
                 </div>
               )}
 
@@ -802,8 +850,8 @@ function CopyFromQuarterModal({
 
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100">
           <button onClick={onClose} className={btnSecondary}>Batal</button>
-          <button onClick={doCopy} disabled={copying || selected.size === 0 || !!result} className={btnPrimary}>
-            {copying ? "⏳ Menyalin..." : `📋 Salin${selected.size > 0 ? ` (${selected.size} anggota)` : ""}`}
+          <button onClick={doCopy} disabled={copying || totalSel === 0 || !!result} className={btnPrimary}>
+            {copying ? "⏳ Menyalin..." : `📋 Salin${totalSel > 0 ? ` (${totalSel} KR)` : ""}`}
           </button>
         </div>
       </div>

@@ -12,7 +12,7 @@ function norm(s: string): string {
   return out.replace(/[\r\n\t]+/g, " ").replace(/\s{2,}/g, " ").trim().toLowerCase();
 }
 
-// GET — preview: how many members/obj/kr exist in the source quarter
+// GET — full preview with objectives + KRs for checkbox selection
 export async function GET(req: Request) {
   const session = await auth();
   if (!session || session.user.role === "MEMBER") return Response.json({ error: "Forbidden" }, { status: 403 });
@@ -29,8 +29,11 @@ export async function GET(req: Request) {
         where: { objective: { quarterId: fromQuarterId } },
         include: {
           objective: { select: { title: true } },
-          krAssignments: { select: { id: true } },
+          krAssignments: {
+            include: { keyResult: { select: { title: true, unit: true } } },
+          },
         },
+        orderBy: { objective: { createdAt: "asc" } },
       },
     },
     orderBy: { name: "asc" },
@@ -40,32 +43,56 @@ export async function GET(req: Request) {
     .filter((m) => m.assignments.length > 0)
     .map((m) => ({
       name: m.name,
-      objectiveCount: m.assignments.length,
-      krCount: m.assignments.reduce((s, a) => s + a.krAssignments.length, 0),
-      objectives: [...new Set(m.assignments.map((a) => a.objective.title))],
+      objectives: m.assignments.map((a) => ({
+        title: a.objective.title,
+        weight: a.weight,
+        krs: a.krAssignments.map((kra) => ({
+          title: kra.keyResult.title,
+          unit: kra.keyResult.unit,
+          weight: kra.weight,
+          target: kra.target,
+        })),
+      })),
     }));
 
-  return Response.json({ members: preview, total: preview.length });
+  return Response.json({ members: preview });
 }
 
-// POST — copy assignments from source quarter to target quarter
+// POST — copy with granular KR-level selection
+// selections: Array<{ memberName: string; krKeys: string[] }>
+// krKeys format: "objectiveTitle::krTitle"  (exact titles from preview)
 export async function POST(req: Request) {
   const session = await auth();
   if (!session || session.user.role === "MEMBER") return Response.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await req.json();
-  const { fromQuarterId, toQuarterId, selectedMemberNames } = body;
+  const { fromQuarterId, toQuarterId, selections } = body;
   const leadId: string = body.leadId ?? session.user.id;
 
-  if (!fromQuarterId || !toQuarterId) return Response.json({ error: "fromQuarterId dan toQuarterId wajib diisi." }, { status: 400 });
+  if (!fromQuarterId || !toQuarterId)
+    return Response.json({ error: "fromQuarterId dan toQuarterId wajib diisi." }, { status: 400 });
 
-  // Fetch source assignments — optionally filtered to selected member names
-  const memberNameFilter = Array.isArray(selectedMemberNames) && selectedMemberNames.length > 0
-    ? { name: { in: selectedMemberNames as string[] } }
-    : {};
+  // Build selection map: norm(memberName) → Set<norm("objTitle::krTitle")>
+  type SelEntry = { memberName: string; krKeys: string[] };
+  const selMap = new Map<string, Set<string>>();
+  if (Array.isArray(selections) && selections.length > 0) {
+    for (const s of selections as SelEntry[]) {
+      if (s.krKeys.length > 0)
+        selMap.set(norm(s.memberName), new Set(s.krKeys.map((k) => norm(k))));
+    }
+  }
+  const useSel = selMap.size > 0;
 
+  // Fetch source assignments (filter members if selection provided)
+  const memberNames = useSel ? [...selMap.keys()] : [];
   const sourceMembers = await prisma.teamMember.findMany({
-    where: { leadId, ...memberNameFilter },
+    where: {
+      leadId,
+      ...(memberNames.length > 0 ? { name: { in: [...selMap.keys()].map((n) => {
+        // reverse-norm: find original names — just fetch all and filter below
+        return n;
+      }) } } : {}),
+    },
     include: {
       assignments: {
         where: { objective: { quarterId: fromQuarterId } },
@@ -77,15 +104,13 @@ export async function POST(req: Request) {
     },
   });
 
-  // Fetch target quarter objectives + KRs
+  // Fetch target objectives + KRs
   const targetObjectives = await prisma.objective.findMany({
     where: { userId: leadId, quarterId: toQuarterId },
     include: { keyResults: true },
   });
-
-  if (targetObjectives.length === 0) {
-    return Response.json({ error: "Quarter tujuan belum punya objective. Buat OKR Divisi dulu sebelum menyalin distribusi." }, { status: 400 });
-  }
+  if (targetObjectives.length === 0)
+    return Response.json({ error: "Quarter tujuan belum punya objective. Buat OKR Divisi dulu." }, { status: 400 });
 
   const targetObjMap = new Map(targetObjectives.map((o) => [norm(o.title), o]));
   const targetKrMap = new Map(
@@ -98,41 +123,53 @@ export async function POST(req: Request) {
   for (const member of sourceMembers) {
     if (member.assignments.length === 0) continue;
 
-    for (const srcAssignment of member.assignments) {
-      const targetObj = targetObjMap.get(norm(srcAssignment.objective.title))
-        ?? targetObjectives.find((o) => {
-          const on = norm(o.title);
-          const sn = norm(srcAssignment.objective.title);
-          return on.includes(sn) || sn.includes(on);
-        });
+    const memberNorm = norm(member.name);
+    // Skip if selection active and member not in it
+    if (useSel && !selMap.has(memberNorm)) continue;
 
+    const allowedKrKeys = selMap.get(memberNorm); // Set<"normObjTitle::normKrTitle"> or undefined
+
+    for (const srcAss of member.assignments) {
+      const srcObjNorm = norm(srcAss.objective.title);
+
+      // Skip entire objective if none of its KRs are selected
+      if (allowedKrKeys) {
+        const hasAny = srcAss.krAssignments.some((kra) =>
+          allowedKrKeys.has(`${srcObjNorm}::${norm(kra.keyResult.title)}`)
+        );
+        if (!hasAny) continue;
+      }
+
+      const targetObj = targetObjMap.get(srcObjNorm)
+        ?? targetObjectives.find((o) => { const on = norm(o.title); return on.includes(srcObjNorm) || srcObjNorm.includes(on); });
       if (!targetObj) {
-        errors.push(`Objective "${srcAssignment.objective.title}" tidak ditemukan di quarter tujuan (judul berbeda).`);
+        errors.push(`Objective "${srcAss.objective.title}" tidak ditemukan di quarter tujuan.`);
         continue;
       }
 
-      let targetAssignment;
+      let targetAss;
       try {
-        targetAssignment = await prisma.objectiveAssignment.upsert({
+        targetAss = await prisma.objectiveAssignment.upsert({
           where: { memberId_objectiveId: { memberId: member.id, objectiveId: targetObj.id } },
-          create: { memberId: member.id, objectiveId: targetObj.id, weight: srcAssignment.weight },
-          update: { weight: srcAssignment.weight },
+          create: { memberId: member.id, objectiveId: targetObj.id, weight: srcAss.weight },
+          update: { weight: srcAss.weight },
         });
         copiedAssignments++;
       } catch (e) {
-        errors.push(`Assignment ${member.name} → "${srcAssignment.objective.title}": ${String(e)}`);
+        errors.push(`Assignment ${member.name} → "${srcAss.objective.title}": ${String(e)}`);
         continue;
       }
 
-      for (const srcKra of srcAssignment.krAssignments) {
-        const krKey = `${targetObj.id}::${norm(srcKra.keyResult.title)}`;
-        const targetKr = targetKrMap.get(krKey)
-          ?? targetObj.keyResults.find((k) => {
-            const kn = norm(k.title);
-            const sn = norm(srcKra.keyResult.title);
-            return kn.includes(sn) || sn.includes(kn);
-          });
+      for (const srcKra of srcAss.krAssignments) {
+        const krNorm = norm(srcKra.keyResult.title);
+        const krSelKey = `${srcObjNorm}::${krNorm}`;
 
+        // Skip if this KR not selected
+        if (allowedKrKeys && !allowedKrKeys.has(krSelKey)) continue;
+
+        const krKey = `${targetObj.id}::${krNorm}`;
+        const targetKr = targetKrMap.get(krKey)
+          ?? targetObj.keyResults.find((k) => { const kn = norm(k.title); return kn.includes(krNorm) || krNorm.includes(kn); });
         if (!targetKr) {
           errors.push(`KR "${srcKra.keyResult.title}" tidak ditemukan di "${targetObj.title}".`);
           continue;
@@ -140,8 +177,8 @@ export async function POST(req: Request) {
 
         try {
           await prisma.kRAssignment.upsert({
-            where: { assignmentId_keyResultId: { assignmentId: targetAssignment.id, keyResultId: targetKr.id } },
-            create: { assignmentId: targetAssignment.id, keyResultId: targetKr.id, weight: srcKra.weight, progress: 0, target: srcKra.target },
+            where: { assignmentId_keyResultId: { assignmentId: targetAss.id, keyResultId: targetKr.id } },
+            create: { assignmentId: targetAss.id, keyResultId: targetKr.id, weight: srcKra.weight, progress: 0, target: srcKra.target },
             update: { weight: srcKra.weight, target: srcKra.target },
           });
           copiedKRAs++;
@@ -154,7 +191,7 @@ export async function POST(req: Request) {
 
   return Response.json({
     success: true,
-    message: `Berhasil menyalin ${copiedAssignments} assignment (${copiedKRAs} KR) dari quarter sebelumnya. Progress yang sudah diisi tetap terjaga.`,
+    message: `Berhasil menyalin ${copiedAssignments} assignment (${copiedKRAs} KR). Progress yang sudah diisi tetap terjaga.`,
     errors: errors.length > 0 ? errors : undefined,
   });
 }
