@@ -58,10 +58,12 @@ const btnDanger = "text-slate-300 hover:text-red-500 transition-colors duration-
 // ─── KR row ───────────────────────────────────────────────────────────────────
 
 function KRRow({
-  kra, kr, onWeightChange, onProgressChange, onTargetChange, onRemove,
+  kra, kr, objIndex, krIndex, onWeightChange, onProgressChange, onTargetChange, onRemove,
 }: {
   kra: KRAssignment;
   kr: KeyResult;
+  objIndex: number;
+  krIndex: number;
   onWeightChange: (id: string, val: number) => void;
   onProgressChange: (id: string, val: number) => void;
   onTargetChange: (id: string, val: number | null) => void;
@@ -75,7 +77,10 @@ function KRRow({
   return (
     <div className="bg-white border border-slate-100 rounded-xl p-3 space-y-2.5">
       <div className="flex items-start justify-between gap-2">
-        <span className="text-sm font-medium text-slate-700 leading-snug">🔑 {kr.title}</span>
+        <div className="flex items-start gap-2 min-w-0">
+          <span className="text-xs font-bold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5">{objIndex}.{krIndex}</span>
+          <span className="text-sm font-medium text-slate-700 leading-snug break-words">{kr.title}</span>
+        </div>
         <button onClick={() => onRemove(kra.id)} className={`${btnDanger} flex-shrink-0 mt-0.5`}>
           <Trash2 size={12} />
         </button>
@@ -91,6 +96,7 @@ function KRRow({
             value={kra.weight}
             min={0} max={100} step={1}
             onChange={(e) => onWeightChange(kra.id, Number(e.target.value))}
+            onWheel={(e) => e.currentTarget.blur()}
           />
           <span className="text-xs text-slate-400">%</span>
         </div>
@@ -112,6 +118,7 @@ function KRRow({
               const v = e.target.value === "" ? null : Number(e.target.value);
               onTargetChange(kra.id, v);
             }}
+            onWheel={(e) => e.currentTarget.blur()}
           />
           <span className="text-xs text-slate-400">{kr.unit}</span>
           {kra.target !== null && (
@@ -132,6 +139,7 @@ function KRRow({
             value={kra.progress}
             min={0}
             onChange={(e) => onProgressChange(kra.id, Number(e.target.value))}
+            onWheel={(e) => e.currentTarget.blur()}
           />
           <span className="text-xs text-slate-400 flex-shrink-0">/ {effectiveTarget} {kr.unit}</span>
         </div>
@@ -157,11 +165,12 @@ function KRRow({
 // ─── Assignment row ───────────────────────────────────────────────────────────
 
 function AssignmentRow({
-  assignment, objectives, onRemove, onWeightChange, onAddKR, onRemoveKR,
+  assignment, objectives, objIndex, onRemove, onWeightChange, onAddKR, onRemoveKR,
   onKRWeightChange, onKRProgressChange, onKRTargetChange,
 }: {
   assignment: Assignment;
   objectives: Objective[];
+  objIndex: number;
   onRemove: (id: string) => void;
   onWeightChange: (id: string, val: number) => void;
   onAddKR: (assignmentId: string, keyResultId: string) => void;
@@ -180,8 +189,9 @@ function AssignmentRow({
 
   return (
     <div className="border border-slate-100 rounded-xl overflow-hidden">
-      <div className="flex items-center gap-3 px-3 py-2.5 bg-slate-50">
-        <span className="flex-1 text-sm font-semibold text-slate-700 truncate">🎯 {assignment.objective.title}</span>
+      <div className="flex items-start gap-3 px-3 py-2.5 bg-slate-50">
+        <span className="text-xs font-bold text-amber-600 bg-amber-100 px-1.5 py-0.5 rounded flex-shrink-0 mt-0.5">{objIndex}</span>
+        <span className="flex-1 text-sm font-semibold text-slate-700 break-words">{assignment.objective.title}</span>
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <span className="text-xs text-slate-400">⚖️</span>
           <input
@@ -190,6 +200,7 @@ function AssignmentRow({
             value={assignment.weight}
             min={0} max={100}
             onChange={(e) => onWeightChange(assignment.id, Number(e.target.value))}
+            onWheel={(e) => e.currentTarget.blur()}
           />
           <span className="text-xs text-slate-400">%</span>
         </div>
@@ -213,7 +224,7 @@ function AssignmentRow({
 
       {open && (
         <div className="px-3 pb-3 pt-1 space-y-2">
-          {assignment.krAssignments.map((kra) => {
+          {assignment.krAssignments.map((kra, krIdx) => {
             // Prefer embedded keyResult (from include), fall back to objectives lookup
             const kr = kra.keyResult ?? allKRs.find((k) => k.id === kra.keyResultId) ?? null;
             return kr ? (
@@ -221,6 +232,8 @@ function AssignmentRow({
                 key={kra.id}
                 kra={kra}
                 kr={kr}
+                objIndex={objIndex}
+                krIndex={krIdx + 1}
                 onWeightChange={(id, val) => onKRWeightChange(id, assignment.id, val)}
                 onProgressChange={(id, val) => onKRProgressChange(id, assignment.id, val)}
                 onTargetChange={(id, val) => onKRTargetChange(id, assignment.id, val)}
@@ -269,7 +282,7 @@ function MemberCard({
   onKRProgressChange: (kraId: string, assignmentId: string, memberId: string, val: number) => void;
   onKRTargetChange: (kraId: string, assignmentId: string, memberId: string, val: number | null) => void;
 }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const totalWeight = member.assignments.reduce((s, a) => s + Number(a.weight), 0);
   const assignedObjectiveIds = new Set(member.assignments.map((a) => a.objectiveId));
   const unassigned = objectives.filter((o) => !assignedObjectiveIds.has(o.id));
@@ -326,11 +339,12 @@ function MemberCard({
           </div>
 
           <div className="p-3 space-y-2">
-            {member.assignments.map((a) => (
+            {member.assignments.map((a, aIdx) => (
               <AssignmentRow
                 key={a.id}
                 assignment={a}
                 objectives={objectives}
+                objIndex={aIdx + 1}
                 onRemove={(id) => onRemoveAssignment(id, member.id)}
                 onWeightChange={(id, val) => onWeightChange(id, member.id, val)}
                 onAddKR={(assignmentId, krId) => onAddKR(assignmentId, member.id, krId)}
@@ -1222,7 +1236,7 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
         </div>
       )}
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div className="space-y-4">
         {members.map((m) => (
           <MemberCard
             key={m.id}
