@@ -639,13 +639,13 @@ function CopyFromQuarterModal({
     setSourceId(qId); setPreview([]); setKrSel(new Map()); setExpanded(new Set()); setResult(null); setDebugInfo(null);
     if (!qId) return;
     setLoading(true);
+    let members: MemberPreview[] = [];
     try {
       const res = await fetch(`/api/distribusi/copy?fromQuarterId=${qId}&leadId=${encodeURIComponent(leadId)}`);
       const data = await res.json();
       if (!res.ok) { setDebugInfo(`Error ${res.status}: ${data.error ?? JSON.stringify(data)}`); setLoading(false); return; }
-      const members: MemberPreview[] = Array.isArray(data.members) ? data.members : [];
+      members = Array.isArray(data.members) ? data.members : [];
       setPreview(members);
-      if (data._debug) setDebugInfo(JSON.stringify(data._debug));
     } catch (e) {
       setDebugInfo(`Network error: ${String(e)}`);
     }
