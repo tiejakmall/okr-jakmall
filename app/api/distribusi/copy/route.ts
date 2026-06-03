@@ -33,7 +33,7 @@ export async function GET(req: Request) {
             include: { keyResult: { select: { title: true, unit: true } } },
           },
         },
-        orderBy: { objective: { createdAt: "asc" } },
+        orderBy: { id: "asc" },
       },
     },
     orderBy: { name: "asc" },
@@ -83,16 +83,9 @@ export async function POST(req: Request) {
   }
   const useSel = selMap.size > 0;
 
-  // Fetch source assignments (filter members if selection provided)
-  const memberNames = useSel ? [...selMap.keys()] : [];
+  // Fetch all source members — selection filtering is done in-loop via norm()
   const sourceMembers = await prisma.teamMember.findMany({
-    where: {
-      leadId,
-      ...(memberNames.length > 0 ? { name: { in: [...selMap.keys()].map((n) => {
-        // reverse-norm: find original names — just fetch all and filter below
-        return n;
-      }) } } : {}),
-    },
+    where: { leadId },
     include: {
       assignments: {
         where: { objective: { quarterId: fromQuarterId } },
