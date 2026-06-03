@@ -92,13 +92,9 @@ export async function GET(req: Request) {
     achievement: calcMemberAchievement(m.assignments, objectives),
   }));
 
-  const divisionAchievement = memberAchievements.length > 0
-    ? memberAchievements.reduce((s, m) => s + m.achievement, 0) / memberAchievements.length
-    : objectives.length > 0
-    ? objectives.reduce((s, o) => {
-        const totalW = objectives.reduce((a, b) => a + b.weight, 0);
-        return s + (calcObjectiveAchievement(o) * o.weight) / (totalW || 1);
-      }, 0)
+  const totalObjW = objectives.reduce((s, o) => s + o.weight, 0);
+  const divisionAchievement = totalObjW > 0
+    ? objectives.reduce((s, o) => s + (calcObjectiveAchievement(o) * o.weight) / totalObjW, 0)
     : 0;
 
   return NextResponse.json({

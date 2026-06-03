@@ -37,9 +37,9 @@ export async function GET(req: Request) {
     .sort((a, b) => b.achievement - a.achievement);
 
   const totalW = objectives.reduce((s, o) => s + o.weight, 0);
-  const divisionAchievement = memberAchievements.length > 0
-    ? memberAchievements.reduce((s, m) => s + m.achievement, 0) / memberAchievements.length
-    : objectives.reduce((s, o) => s + (calcObjectiveAchievement(o) * o.weight) / (totalW || 1), 0);
+  const divisionAchievement = totalW > 0
+    ? objectives.reduce((s, o) => s + (calcObjectiveAchievement(o) * o.weight) / totalW, 0)
+    : 0;
 
   // ── Build Excel ──────────────────────────────────────────────────────────────
   const wb = new ExcelJS.Workbook();
