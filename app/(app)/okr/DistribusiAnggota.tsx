@@ -1006,8 +1006,8 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
   }
 
   async function deleteMember(id: string) {
-    if (!confirm("Hapus anggota ini beserta semua assignment-nya?")) return;
-    await fetch(`/api/team-members/${id}`, { method: "DELETE" });
+    if (!confirm("Hapus anggota ini dari distribusi quarter ini?\n\nData di quarter lain tidak akan terhapus.")) return;
+    await fetch(`/api/team-members/${id}?quarterId=${encodeURIComponent(quarterId)}`, { method: "DELETE" });
     setMembers((prev) => prev.filter((m) => m.id !== id));
   }
 
