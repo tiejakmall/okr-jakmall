@@ -45,23 +45,29 @@ export function calcObjectiveAchievement(obj: ObjWithKRs): number {
   );
 }
 
-// Aggregate teamProgress per KR from all member KRAssignments (sum of contributions)
+// Aggregate teamProgress per KR from all member KRAssignments.
+// For % unit: average across members. For others: sum contributions.
 export function aggregateKRProgress(
   objectives: ObjWithKRs[],
   allKRAssignments: KRAssignment[]
 ): ObjWithKRs[] {
-  // Build map: keyResultId → total progress (sum)
-  const progressMap = new Map<string, number>();
+  const progressListMap = new Map<string, number[]>();
   for (const kra of allKRAssignments) {
-    progressMap.set(kra.keyResultId, (progressMap.get(kra.keyResultId) ?? 0) + kra.progress);
+    const list = progressListMap.get(kra.keyResultId) ?? [];
+    list.push(kra.progress);
+    progressListMap.set(kra.keyResultId, list);
   }
 
   return objectives.map((obj) => ({
     ...obj,
     keyResults: obj.keyResults.map((kr) => {
-      const aggregated = progressMap.get(kr.id);
-      if (aggregated === undefined) return kr; // no member assigned → keep original
-      return { ...kr, teamProgress: aggregated };
+      const list = progressListMap.get(kr.id);
+      if (!list || list.length === 0) return kr;
+      const teamProgress =
+        kr.unit === "%"
+          ? list.reduce((s, v) => s + v, 0) / list.length
+          : list.reduce((s, v) => s + v, 0);
+      return { ...kr, teamProgress };
     }),
   }));
 }
