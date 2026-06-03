@@ -195,10 +195,6 @@ function ObjectiveSection({ obj, index }: { obj: ObjData; index: number }) {
                             const pct = kr.target > 0 && contrib
                               ? Math.min((contrib.progress / kr.target) * 100, 100)
                               : 0;
-                            // share of total KR progress
-                            const share = kr.teamProgress > 0 && contrib
-                              ? Math.round((contrib.progress / kr.teamProgress) * 100)
-                              : 0;
                             return (
                               <td key={kr.id} className="py-2 px-2 text-right text-xs">
                                 {contrib ? (
@@ -206,7 +202,7 @@ function ObjectiveSection({ obj, index }: { obj: ObjData; index: number }) {
                                     <span className="font-semibold text-slate-700 tabular-nums">
                                       {contrib.progress}/{kr.target} {kr.unit}
                                     </span>
-                                    <span className="text-slate-400 ml-1">({share}%)</span>
+                                    <span className={`ml-1 font-semibold ${pct >= 100 ? "text-green-600" : pct >= 70 ? "text-amber-500" : "text-red-500"}`}>({pct.toFixed(0)}%)</span>
                                   </div>
                                 ) : (
                                   <span className="text-slate-300">—</span>
