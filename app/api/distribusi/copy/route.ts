@@ -55,7 +55,15 @@ export async function GET(req: Request) {
       })),
     }));
 
-  return Response.json({ members: preview });
+  return Response.json({
+    members: preview,
+    _debug: {
+      leadId: leadId.slice(-8),
+      fromQuarterId: fromQuarterId.slice(-8),
+      totalMembersFound: members.length,
+      membersWithAssignments: members.filter((m) => m.assignments.length > 0).length,
+    },
+  });
 }
 
 // POST — copy with granular KR-level selection

@@ -634,13 +634,22 @@ function CopyFromQuarterModal({
 
   useEffect(() => { if (sourceId) loadPreview(sourceId); /* eslint-disable-next-line */ }, []);
 
+  const [debugInfo, setDebugInfo] = useState<string | null>(null);
+
   async function loadPreview(qId: string) {
-    setSourceId(qId); setPreview([]); setKrSel(new Map()); setExpanded(new Set()); setResult(null);
+    setSourceId(qId); setPreview([]); setKrSel(new Map()); setExpanded(new Set()); setResult(null); setDebugInfo(null);
     if (!qId) return;
     setLoading(true);
-    const data = await fetch(`/api/distribusi/copy?fromQuarterId=${qId}&leadId=${encodeURIComponent(leadId)}`).then((r) => r.json());
-    const members: MemberPreview[] = Array.isArray(data.members) ? data.members : [];
-    setPreview(members);
+    try {
+      const res = await fetch(`/api/distribusi/copy?fromQuarterId=${qId}&leadId=${encodeURIComponent(leadId)}`);
+      const data = await res.json();
+      if (!res.ok) { setDebugInfo(`Error ${res.status}: ${data.error ?? JSON.stringify(data)}`); setLoading(false); return; }
+      const members: MemberPreview[] = Array.isArray(data.members) ? data.members : [];
+      setPreview(members);
+      if (data._debug) setDebugInfo(JSON.stringify(data._debug));
+    } catch (e) {
+      setDebugInfo(`Network error: ${String(e)}`);
+    }
     // default: all KRs selected
     const init = new Map<string, Set<string>>();
     for (const m of members) {
@@ -753,7 +762,10 @@ function CopyFromQuarterModal({
 
               {loadingPreview && <p className="text-slate-400 text-sm text-center py-4">⏳ Memuat data...</p>}
               {!loadingPreview && sourceId && preview.length === 0 && (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-500 text-center">Belum ada distribusi di quarter ini.</div>
+                <div className="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-xs text-slate-500 text-center space-y-1">
+                  <p>Belum ada distribusi di quarter ini.</p>
+                  {debugInfo && <p className="font-mono text-slate-400 break-all">{debugInfo}</p>}
+                </div>
               )}
 
               {!loadingPreview && preview.length > 0 && (
