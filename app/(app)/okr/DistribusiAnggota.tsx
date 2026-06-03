@@ -622,19 +622,18 @@ function CopyFromQuarterModal({
   allQuarters: Quarter[]; currentQuarterId: string; leadId: string;
   onCopied: () => void; onClose: () => void;
 }) {
-  const otherQuarters = allQuarters.filter((q) => q.id !== currentQuarterId);
-  const [sourceId, setSourceId]       = useState(otherQuarters[0]?.id ?? "");
+  // source: any quarter; destination: any OTHER quarter than source
+  const [sourceId, setSourceId]       = useState(currentQuarterId); // default: copy FROM current
+  const [destId, setDestId]           = useState("");                // user picks destination
   const [preview, setPreview]         = useState<MemberPreview[]>([]);
-  // krSel: memberName → Set<"objTitle::krTitle">
   const [krSel, setKrSel]             = useState<Map<string, Set<string>>>(new Map());
   const [expanded, setExpanded]       = useState<Set<string>>(new Set());
   const [loadingPreview, setLoading]  = useState(false);
   const [copying, setCopying]         = useState(false);
   const [result, setResult]           = useState<{ type: "success"|"error"; message: string; errors?: string[] }|null>(null);
+  const [debugInfo, setDebugInfo]     = useState<string | null>(null);
 
   useEffect(() => { if (sourceId) loadPreview(sourceId); /* eslint-disable-next-line */ }, []);
-
-  const [debugInfo, setDebugInfo] = useState<string | null>(null);
 
   async function loadPreview(qId: string) {
     setSourceId(qId); setPreview([]); setKrSel(new Map()); setExpanded(new Set()); setResult(null); setDebugInfo(null);
@@ -711,19 +710,24 @@ function CopyFromQuarterModal({
   }
 
   async function doCopy() {
-    if (!sourceId || totalSel === 0) return;
+    if (!sourceId || !destId || totalSel === 0) return;
     setCopying(true); setResult(null);
     const selections = preview
       .filter((m) => selCount(m) > 0)
       .map((m) => ({ memberName: m.name, krKeys: [...(krSel.get(m.name) ?? [])] }));
     const res  = await fetch("/api/distribusi/copy", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fromQuarterId: sourceId, toQuarterId: currentQuarterId, leadId, selections }),
+      body: JSON.stringify({ fromQuarterId: sourceId, toQuarterId: destId, leadId, selections }),
     });
     const data = await res.json();
     if (res.ok && data.success) {
       setResult({ type: "success", message: data.message, errors: data.errors });
-      setTimeout(() => { onCopied(); onClose(); }, 1200);
+      // Only reload if destination is the currently viewed quarter
+      if (destId === currentQuarterId) {
+        setTimeout(() => { onCopied(); onClose(); }, 1200);
+      } else {
+        setTimeout(() => onClose(), 1200);
+      }
     } else {
       setResult({ type: "error", message: data.error ?? "Gagal menyalin.", errors: data.errors });
     }
@@ -742,22 +746,30 @@ function CopyFromQuarterModal({
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-2.5 text-xs text-amber-700">
-            <span>📥</span>
-            <span>Salin ke: <strong>{allQuarters.find((q) => q.id === currentQuarterId)?.name}</strong></span>
-          </div>
-
-          {otherQuarters.length === 0 ? (
+          {allQuarters.length < 2 ? (
             <p className="text-slate-500 text-sm text-center py-8">Tidak ada quarter lain yang tersedia.</p>
           ) : (
             <>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 mb-1.5">Salin dari Quarter</label>
-                <select value={sourceId} onChange={(e) => loadPreview(e.target.value)}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white">
-                  <option value="">-- Pilih Quarter --</option>
-                  {otherQuarters.map((q) => <option key={q.id} value={q.id}>{q.name}</option>)}
-                </select>
+              {/* Source + Destination */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">📤 Salin dari</label>
+                  <select value={sourceId} onChange={(e) => { setDestId(""); loadPreview(e.target.value); }}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white">
+                    <option value="">-- Pilih --</option>
+                    {allQuarters.map((q) => <option key={q.id} value={q.id}>{q.name}{q.id === currentQuarterId ? " (aktif)" : ""}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">📥 Salin ke</label>
+                  <select value={destId} onChange={(e) => setDestId(e.target.value)}
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white">
+                    <option value="">-- Pilih --</option>
+                    {allQuarters.filter((q) => q.id !== sourceId).map((q) => (
+                      <option key={q.id} value={q.id}>{q.name}{q.id === currentQuarterId ? " (aktif)" : ""}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {loadingPreview && <p className="text-slate-400 text-sm text-center py-4">⏳ Memuat data...</p>}
@@ -862,8 +874,8 @@ function CopyFromQuarterModal({
 
         <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-slate-100">
           <button onClick={onClose} className={btnSecondary}>Batal</button>
-          <button onClick={doCopy} disabled={copying || totalSel === 0 || !!result} className={btnPrimary}>
-            {copying ? "⏳ Menyalin..." : `📋 Salin${totalSel > 0 ? ` (${totalSel} KR)` : ""}`}
+          <button onClick={doCopy} disabled={copying || !destId || totalSel === 0 || !!result} className={btnPrimary}>
+            {copying ? "⏳ Menyalin..." : !destId ? "Pilih tujuan dulu" : `📋 Salin${totalSel > 0 ? ` (${totalSel} KR)` : ""}`}
           </button>
         </div>
       </div>
