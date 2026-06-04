@@ -1082,9 +1082,9 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
   }
 
   async function deleteMember(id: string) {
-    if (!confirm("Hapus anggota ini dari distribusi quarter ini saja?\n\nData di quarter lain tidak akan terhapus.")) return;
-    await fetch(`/api/team-members/${id}?quarterId=${encodeURIComponent(quarterId)}`, { method: "DELETE" });
-    setMembers((prev) => prev.filter((m) => m.id !== id));
+    if (!confirm("Hapus anggota ini dari tim? Semua assignment-nya juga akan terhapus.")) return;
+    const res = await fetch(`/api/team-members/${id}`, { method: "DELETE" });
+    if (res.ok) setMembers((prev) => prev.filter((m) => m.id !== id));
   }
 
   async function addAssignment(memberId: string, objectiveId: string) {
@@ -1102,8 +1102,8 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
   }
 
   async function removeAssignment(assignmentId: string, memberId: string) {
-    await fetch(`/api/assignments/${assignmentId}`, { method: "DELETE" });
-    setMembers((prev) => prev.map((m) => m.id === memberId
+    const res = await fetch(`/api/assignments/${assignmentId}`, { method: "DELETE" });
+    if (res.ok) setMembers((prev) => prev.map((m) => m.id === memberId
       ? { ...m, assignments: m.assignments.filter((a) => a.id !== assignmentId) }
       : m
     ));
@@ -1140,8 +1140,8 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
   }
 
   async function removeKR(kraId: string, assignmentId: string, memberId: string) {
-    await fetch(`/api/kr-assignments/${kraId}`, { method: "DELETE" });
-    setMembers((prev) => prev.map((m) => m.id === memberId
+    const res = await fetch(`/api/kr-assignments/${kraId}`, { method: "DELETE" });
+    if (res.ok) setMembers((prev) => prev.map((m) => m.id === memberId
       ? { ...m, assignments: m.assignments.map((a) => a.id === assignmentId
           ? { ...a, krAssignments: a.krAssignments.filter((kra) => kra.id !== kraId) }
           : a
