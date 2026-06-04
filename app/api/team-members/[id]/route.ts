@@ -11,13 +11,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return NextResponse.json(member);
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth();
   if (!session || session.user.role === "MEMBER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const { id } = await params;
+  const quarterId = req.nextUrl.searchParams.get("quarterId");
+  if (!quarterId) return NextResponse.json({ error: "quarterId wajib diisi." }, { status: 400 });
 
-  // Delete the TeamMember record — cascades to ObjectiveAssignment and KRAssignment
-  await prisma.teamMember.delete({ where: { id } });
+  // Delete this quarter's assignments only
+  const toDelete = await prisma.objectiveAssignment.findMany({
+    where: { memberId: id, objective: { quarterId } },
+    select: { id: true },
+  });
+  if (toDelete.length > 0) {
+    await prisma.objectiveAssignment.deleteMany({ where: { id: { in: toDelete.map((a) => a.id) } } });
+  }
+
+  // If no assignments remain in any quarter, clean up the TeamMember record too
+  const remaining = await prisma.objectiveAssignment.count({ where: { memberId: id } });
+  if (remaining === 0) {
+    await prisma.teamMember.delete({ where: { id } });
+  }
 
   return new NextResponse(null, { status: 204 });
 }
