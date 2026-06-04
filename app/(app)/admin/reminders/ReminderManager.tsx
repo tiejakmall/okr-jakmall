@@ -33,12 +33,12 @@ export default function ReminderManager({
 }) {
   const activeQuarter = quarters.find((q) => q.isActive) ?? quarters[0];
   const [selectedQuarterId, setSelectedQuarterId] = useState(activeQuarter?.id ?? "");
-  const [sending, setSending] = useState<"settings" | "results" | null>(null);
-  const [result, setResult] = useState<{ type: "settings" | "results"; message: string; results: SendResult[]; success: boolean } | null>(null);
+  const [sending, setSending] = useState<"settings" | "results" | "collection" | null>(null);
+  const [result, setResult] = useState<{ type: "settings" | "results" | "collection"; message: string; results: SendResult[]; success: boolean } | null>(null);
 
   const selectedQuarter = quarters.find((q) => q.id === selectedQuarterId);
 
-  async function sendReminder(type: "settings" | "results") {
+  async function sendReminder(type: "settings" | "results" | "collection") {
     if (!selectedQuarterId) return;
     setSending(type);
     setResult(null);
@@ -75,7 +75,7 @@ export default function ReminderManager({
       </div>
 
       {/* Reminder cards */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         {/* Card 1: Setting OKR */}
         <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
           <div>
@@ -117,6 +117,26 @@ export default function ReminderManager({
             {sending === "results" ? "⏳ Mengirim..." : "📧 Kirim Reminder Hasil"}
           </button>
         </div>
+        {/* Card 3: Pengumpulan */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 space-y-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xl">📋</span>
+              <h3 className="font-bold text-slate-800">Reminder Pengumpulan</h3>
+            </div>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Cek menyeluruh di <strong>akhir quarter</strong>: bobot, target, satuan, progress anggota, dan capaian lead.
+              Hanya kirim ke yang datanya belum lengkap.
+            </p>
+          </div>
+          <button
+            onClick={() => sendReminder("collection")}
+            disabled={!selectedQuarterId || sending !== null}
+            className={btnSlate}
+          >
+            {sending === "collection" ? "⏳ Mengirim..." : "📧 Kirim Reminder Pengumpulan"}
+          </button>
+        </div>
       </div>
 
       {/* Result */}
@@ -124,7 +144,7 @@ export default function ReminderManager({
         <div className={`rounded-2xl border p-5 space-y-3 ${result.success ? "bg-green-50 border-green-200" : "bg-red-50 border-red-200"}`}>
           <p className={`font-semibold text-sm ${result.success ? "text-green-700" : "text-red-700"}`}>
             {result.success ? "✅" : "❌"}{" "}
-            {result.type === "settings" ? "Reminder Setting OKR" : "Reminder Isi Hasil"} —{" "}
+            {result.type === "settings" ? "Reminder Setting OKR" : result.type === "collection" ? "Reminder Pengumpulan" : "Reminder Isi Hasil"} —{" "}
             {result.message}
           </p>
           {result.results.length > 0 && (

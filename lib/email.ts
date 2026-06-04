@@ -16,7 +16,7 @@ function createTransporter() {
   });
 }
 
-export type ReminderType = "settings" | "results";
+export type ReminderType = "settings" | "results" | "collection";
 
 export type KRIssue = { title: string; issues: string[] };
 export type ObjectiveIssue = { title: string; issues: string[]; krIssues: KRIssue[] };
@@ -99,11 +99,15 @@ export async function sendReminderEmail({
   completionIssues: CompletionIssues;
 }) {
   const isSettings = type === "settings";
+  const isCollection = type === "collection";
+
   const subject = isSettings
     ? `[Reminder] Mohon lengkapi OKR Divisi – ${quarterName}`
+    : isCollection
+    ? `[Reminder Pengumpulan] Mohon lengkapi data OKR – ${quarterName}`
     : `[Reminder] Mohon update progress OKR – ${quarterName}`;
 
-  const actionLabel = isSettings ? "Buka Halaman OKR" : "Update Progress Sekarang";
+  const actionLabel = isSettings ? "Buka Halaman OKR" : "Buka Halaman Distribusi";
   const link = isSettings
     ? `${APP_URL}/okr?quarterId=${quarterId}`
     : `${APP_URL}/distribusi?quarterId=${quarterId}`;
@@ -112,6 +116,10 @@ export async function sendReminderEmail({
     ? `Halo <strong>${name}</strong>,<br><br>
        Berikut adalah ringkasan <strong>OKR Divisi</strong> kamu untuk quarter <strong>${quarterName}</strong>
        yang masih perlu dilengkapi sebelum batas waktu pengumpulan.`
+    : isCollection
+    ? `Halo <strong>${name}</strong>,<br><br>
+       Ini adalah <strong>reminder pengumpulan akhir quarter</strong> untuk <strong>${quarterName}</strong>.
+       Pastikan seluruh data OKR sudah lengkap — bobot, target, satuan, progress anggota, dan capaian.`
     : `Halo <strong>${name}</strong>,<br><br>
        Berikut adalah ringkasan <strong>progress/hasil OKR</strong> divisi kamu
        untuk quarter <strong>${quarterName}</strong> yang masih perlu diupdate.`;
@@ -135,7 +143,7 @@ export async function sendReminderEmail({
         <tr>
           <td style="padding:28px 32px;">
             <p style="margin:0 0 16px;font-size:22px;font-weight:bold;color:#0f172a;">
-              ${isSettings ? "⏰ Reminder Pengisian OKR" : "📊 Reminder Update Progress OKR"}
+              ${isSettings ? "⏰ Reminder Pengisian OKR" : isCollection ? "📋 Reminder Pengumpulan OKR" : "📊 Reminder Update Progress OKR"}
             </p>
             <p style="margin:0 0 8px;color:#475569;font-size:14px;line-height:1.6;">
               ${introParagraph}

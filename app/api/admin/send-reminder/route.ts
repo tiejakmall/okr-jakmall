@@ -130,6 +130,106 @@ async function getResultsIssues(leadId: string, quarterId: string): Promise<Comp
   return { hasNoObjectives: false, summaryIssues: [], objectives: objectiveIssues };
 }
 
+async function getCollectionIssues(leadId: string, quarterId: string): Promise<CompletionIssues> {
+  const objectives = await prisma.objective.findMany({
+    where: { userId: leadId, quarterId },
+    select: {
+      id: true,
+      title: true,
+      weight: true,
+      keyResults: {
+        select: {
+          id: true,
+          title: true,
+          weight: true,
+          target: true,
+          unit: true,
+          teamProgress: true,
+          leadProgress: true,
+          krAssignments: {
+            select: {
+              weight: true,
+              progress: true,
+              assignment: { select: { member: { select: { name: true } } } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (objectives.length === 0) return { hasNoObjectives: true, summaryIssues: [], objectives: [] };
+
+  const summaryIssues: string[] = [];
+
+  const totalObjWeight = objectives.reduce((s, obj) => s + obj.weight, 0);
+  if (Math.abs(totalObjWeight - 100) > 0.1) {
+    summaryIssues.push(`Total bobot semua Objective: ${totalObjWeight.toFixed(0)}% (harus 100%)`);
+  }
+
+  const objectiveIssues: ObjectiveIssue[] = [];
+
+  for (const obj of objectives) {
+    const issues: string[] = [];
+
+    if (obj.keyResults.length === 0) {
+      issues.push("Belum ada Key Result yang dibuat");
+      objectiveIssues.push({ title: obj.title, issues, krIssues: [] });
+      continue;
+    }
+
+    // Total KR weight
+    const totalKRWeight = obj.keyResults.reduce((s, kr) => s + kr.weight, 0);
+    if (Math.abs(totalKRWeight - 100) > 0.1) {
+      issues.push(`Total bobot KR: ${totalKRWeight.toFixed(0)}% (harus 100%)`);
+    }
+
+    // Per-member bobot
+    const memberWeightMap = new Map<string, number>();
+    for (const kr of obj.keyResults) {
+      for (const kra of kr.krAssignments) {
+        const name = kra.assignment.member.name;
+        memberWeightMap.set(name, (memberWeightMap.get(name) ?? 0) + kra.weight);
+      }
+    }
+    for (const [memberName, totalBobot] of memberWeightMap.entries()) {
+      if (Math.abs(totalBobot - 100) > 0.1) {
+        issues.push(`Bobot ${memberName}: ${totalBobot.toFixed(0)}% (harus 100%)`);
+      }
+    }
+
+    // Per-KR checks: setup + hasil
+    const krIssues = obj.keyResults.flatMap((kr) => {
+      const krIss: string[] = [];
+
+      // Setup fields
+      if (kr.weight === 0) krIss.push("bobot 0%");
+      if (kr.target === 0) krIss.push("target belum diisi");
+      if (!kr.unit || kr.unit.trim() === "") krIss.push("satuan belum dipilih");
+
+      // Hasil fields
+      if (kr.teamProgress === 0) krIss.push("progress tim 0%");
+      if (kr.leadProgress === null || kr.leadProgress === 0) krIss.push("capaian lead belum diisi");
+
+      // Per-member progress
+      const emptyMembers = kr.krAssignments
+        .filter((a) => a.progress === 0)
+        .map((a) => a.assignment.member.name);
+      if (emptyMembers.length > 0) {
+        krIss.push(`progress belum diisi: ${emptyMembers.join(", ")}`);
+      }
+
+      return krIss.length > 0 ? [{ title: kr.title, issues: krIss }] : [];
+    });
+
+    if (issues.length > 0 || krIssues.length > 0) {
+      objectiveIssues.push({ title: obj.title, issues, krIssues });
+    }
+  }
+
+  return { hasNoObjectives: false, summaryIssues, objectives: objectiveIssues };
+}
+
 export async function POST(req: NextRequest) {
   const session = await auth();
   if (session?.user.role !== "ADMIN") {
@@ -168,6 +268,8 @@ export async function POST(req: NextRequest) {
     const completionIssues =
       type === "settings"
         ? await getSettingsIssues(lead.id, quarterId)
+        : type === "collection"
+        ? await getCollectionIssues(lead.id, quarterId)
         : await getResultsIssues(lead.id, quarterId);
 
     const isComplete = !completionIssues.hasNoObjectives && completionIssues.objectives.length === 0;
