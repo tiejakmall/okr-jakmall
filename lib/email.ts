@@ -1,9 +1,20 @@
-import { Resend } from "resend";
-
-const resend = new Resend(process.env.RESEND_API_KEY);
+import nodemailer from "nodemailer";
 
 const APP_URL = process.env.NEXTAUTH_URL ?? "https://okr-jakmall.vercel.app";
-const FROM_EMAIL = process.env.RESEND_FROM ?? "OKR Tracker <onboarding@resend.dev>";
+const GMAIL_USER = process.env.GMAIL_USER ?? "";
+const GMAIL_PASS = process.env.GMAIL_APP_PASSWORD ?? "";
+
+function createTransporter() {
+  return nodemailer.createTransport({
+    host: "smtp.gmail.com",
+    port: 587,
+    secure: false,
+    auth: {
+      user: GMAIL_USER,
+      pass: GMAIL_PASS,
+    },
+  });
+}
 
 export type ReminderType = "settings" | "results";
 
@@ -105,14 +116,12 @@ export async function sendReminderEmail({
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;padding:32px 0;">
     <tr><td align="center">
       <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
-        <!-- Header -->
         <tr>
           <td style="background:#fbbf24;padding:20px 32px;">
             <p style="margin:0;color:#1c1917;font-size:18px;font-weight:bold;">📈 OKR Tracker</p>
             <p style="margin:4px 0 0;color:#78350f;font-size:13px;">${quarterName}</p>
           </td>
         </tr>
-        <!-- Body -->
         <tr>
           <td style="padding:28px 32px;">
             <p style="margin:0 0 16px;font-size:22px;font-weight:bold;color:#0f172a;">
@@ -129,7 +138,6 @@ export async function sendReminderEmail({
             </a>
           </td>
         </tr>
-        <!-- Footer -->
         <tr>
           <td style="padding:16px 32px;background:#f8fafc;border-top:1px solid #e2e8f0;">
             <p style="margin:0;color:#94a3b8;font-size:12px;">
@@ -143,13 +151,11 @@ export async function sendReminderEmail({
 </body>
 </html>`;
 
-  const { data, error } = await resend.emails.send({
-    from: FROM_EMAIL,
+  const transporter = createTransporter();
+  await transporter.sendMail({
+    from: `OKR Tracker <${GMAIL_USER}>`,
     to,
     subject,
     html,
   });
-
-  if (error) throw new Error(error.message);
-  return data;
 }
