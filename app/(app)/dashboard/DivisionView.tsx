@@ -286,10 +286,12 @@ export default function DivisionView({ quarters, leadId, divisionName, defaultQu
             </div>
           )}
           <div className="flex gap-2">
-            <button
-              onClick={() => window.print()}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-[0_2px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-px transition-all duration-75"
-            >🖨️ Print PDF</button>
+            {selectedQ && (
+              <button
+                onClick={() => window.open(`/api/dashboard/division/print?leadId=${leadId}&quarterId=${selectedQ}&divisionName=${encodeURIComponent(divisionName)}`)}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 shadow-[0_2px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-px transition-all duration-75"
+              >🖨️ Print PDF</button>
+            )}
             {selectedQ && (
               <a
                 href={`/api/dashboard/division/export?leadId=${leadId}&quarterId=${selectedQ}&divisionName=${encodeURIComponent(divisionName)}`}

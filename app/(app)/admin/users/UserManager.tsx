@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Trash2, Edit2 } from "lucide-react";
 
 type User = {
@@ -102,8 +102,36 @@ export default function UserManager({ initialUsers }: { initialUsers: User[] }) 
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<{ type: "success" | "error"; message: string; errors?: string[] } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   function cancel() { setShowForm(false); setEditId(null); setForm(emptyForm); }
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    setImportResult(null);
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const res = await fetch("/api/users/import", { method: "POST", body: fd });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setImportResult({ type: "success", message: data.message, errors: data.errors });
+        const reloaded = await fetch("/api/users").then((r) => r.json());
+        setUsers(Array.isArray(reloaded) ? reloaded : []);
+      } else {
+        setImportResult({ type: "error", message: data.error ?? "Import gagal.", errors: data.errors });
+      }
+    } catch {
+      setImportResult({ type: "error", message: "Terjadi kesalahan jaringan." });
+    } finally {
+      setImporting(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
+  }
 
   async function createUser() {
     if (!form.name || !form.email || !form.password) { alert("Nama, email, dan password wajib diisi."); return; }
@@ -145,14 +173,29 @@ export default function UserManager({ initialUsers }: { initialUsers: User[] }) 
 
   return (
     <div>
-      <div className="flex justify-end mb-5">
-        <button
-          onClick={() => { setShowForm((v) => !v); setEditId(null); setForm(emptyForm); }}
-          className={btnPrimary}
-        >
-          ➕ Tambah Pengguna
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => { setShowForm((v) => !v); setEditId(null); setForm(emptyForm); }}
+            className={btnPrimary}
+          >
+            ➕ Tambah Pengguna
+          </button>
+          <a href="/api/users/import" className={btnSecondary}>📋 Download Template</a>
+          <label className={`${btnSecondary} cursor-pointer ${importing ? "opacity-50 pointer-events-none" : ""}`}>
+            {importing ? "⏳ Mengimpor..." : "📤 Bulk Import Excel"}
+            <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} disabled={importing} />
+          </label>
+        </div>
+        <p className="text-xs text-slate-400">Download template → isi → upload untuk buat akun massal</p>
       </div>
+
+      {importResult && (
+        <div className={`rounded-xl px-4 py-3 text-sm mb-4 ${importResult.type === "success" ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"}`}>
+          <p className="font-semibold">{importResult.type === "success" ? "✅" : "❌"} {importResult.message}</p>
+          {importResult.errors?.map((e, i) => <p key={i} className="text-xs mt-0.5">{e}</p>)}
+        </div>
+      )}
 
       {showForm && <UserForm form={form} isEdit={false} onChange={setForm} onSave={createUser} onCancel={cancel} />}
       {editId && <UserForm form={form} isEdit={true} onChange={setForm} onSave={updateUser} onCancel={cancel} />}

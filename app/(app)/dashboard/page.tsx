@@ -4,6 +4,7 @@ import DivisionView from "./DivisionView";
 import IndividualView from "./IndividualView";
 import MemberDashboard from "./MemberDashboard";
 import DashboardTabs from "./DashboardTabs";
+import AdminOverview from "./AdminOverview";
 
 // Find the quarter that actually has assignments for a lead; fall back to active → first
 async function resolveDefaultQuarter(
@@ -101,22 +102,16 @@ export default async function DashboardPage() {
     defaultQuarterByLead[lead.id] = await resolveDefaultQuarter(lead.id, quarters);
   }
 
+  const allMembersByLeadSerialized: Record<string, { id: string; name: string }[]> = {};
+  for (const lead of leads) {
+    allMembersByLeadSerialized[lead.id] = JSON.parse(JSON.stringify(allMembersByLead[lead.id] ?? []));
+  }
+
   return (
-    <div className="space-y-10">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">📊 Dashboard Semua Divisi</h1>
-      </div>
-      {leads.map((lead) => (
-        <div key={lead.id} className="border-t border-slate-200 pt-8">
-          <DashboardTabs
-            title={lead.division ?? lead.name}
-            quarters={JSON.parse(JSON.stringify(quarters))}
-            members={JSON.parse(JSON.stringify(allMembersByLead[lead.id] ?? []))}
-            leadId={lead.id}
-            defaultQuarterId={defaultQuarterByLead[lead.id]}
-          />
-        </div>
-      ))}
-    </div>
+    <AdminOverview
+      leads={JSON.parse(JSON.stringify(leads))}
+      quarters={JSON.parse(JSON.stringify(quarters))}
+      allMembersByLead={allMembersByLeadSerialized}
+    />
   );
 }
