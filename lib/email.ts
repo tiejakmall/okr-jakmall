@@ -22,6 +22,7 @@ export type KRIssue = { title: string; issues: string[] };
 export type ObjectiveIssue = { title: string; issues: string[]; krIssues: KRIssue[] };
 export type CompletionIssues = {
   hasNoObjectives: boolean;
+  summaryIssues: string[];
   objectives: ObjectiveIssue[];
 };
 
@@ -34,7 +35,15 @@ function buildIssuesHtml(issues: CompletionIssues): string {
       </div>`;
   }
 
-  if (issues.objectives.length === 0) return "";
+  const summaryHtml = issues.summaryIssues.length > 0
+    ? `<div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:12px 16px;margin:16px 0 8px;">
+        ${issues.summaryIssues.map(iss =>
+          `<p style="margin:2px 0;font-size:13px;color:#dc2626;">⚠️ ${iss}</p>`
+        ).join("")}
+      </div>`
+    : "";
+
+  if (issues.summaryIssues.length === 0 && issues.objectives.length === 0) return "";
 
   const rows = issues.objectives.map((obj) => {
     const objIssueRows = obj.issues.map(
@@ -69,6 +78,7 @@ function buildIssuesHtml(issues: CompletionIssues): string {
   return `
     <div style="margin:20px 0;">
       <p style="margin:0 0 10px;font-size:14px;font-weight:bold;color:#dc2626;">⚠️ Bagian yang perlu dilengkapi:</p>
+      ${summaryHtml}
       <table width="100%" cellpadding="0" cellspacing="0">${rows}</table>
     </div>`;
 }

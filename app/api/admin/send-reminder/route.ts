@@ -9,6 +9,7 @@ async function getSettingsIssues(leadId: string, quarterId: string): Promise<Com
     select: {
       id: true,
       title: true,
+      weight: true,
       status: true,
       keyResults: {
         select: {
@@ -28,7 +29,15 @@ async function getSettingsIssues(leadId: string, quarterId: string): Promise<Com
     },
   });
 
-  if (objectives.length === 0) return { hasNoObjectives: true, objectives: [] };
+  if (objectives.length === 0) return { hasNoObjectives: true, summaryIssues: [], objectives: [] };
+
+  const summaryIssues: string[] = [];
+
+  // Total objective weight should sum to 100%
+  const totalObjWeight = objectives.reduce((s, obj) => s + obj.weight, 0);
+  if (Math.abs(totalObjWeight - 100) > 0.1) {
+    summaryIssues.push(`Total bobot semua Objective: ${totalObjWeight.toFixed(0)}% (harus 100%)`);
+  }
 
   const objectiveIssues: ObjectiveIssue[] = [];
 
@@ -77,7 +86,7 @@ async function getSettingsIssues(leadId: string, quarterId: string): Promise<Com
     }
   }
 
-  return { hasNoObjectives: false, objectives: objectiveIssues };
+  return { hasNoObjectives: false, summaryIssues, objectives: objectiveIssues };
 }
 
 async function getResultsIssues(leadId: string, quarterId: string): Promise<CompletionIssues> {
@@ -101,7 +110,7 @@ async function getResultsIssues(leadId: string, quarterId: string): Promise<Comp
     },
   });
 
-  if (objectives.length === 0) return { hasNoObjectives: true, objectives: [] };
+  if (objectives.length === 0) return { hasNoObjectives: true, summaryIssues: [], objectives: [] };
 
   const objectiveIssues: ObjectiveIssue[] = [];
 
@@ -118,7 +127,7 @@ async function getResultsIssues(leadId: string, quarterId: string): Promise<Comp
     }
   }
 
-  return { hasNoObjectives: false, objectives: objectiveIssues };
+  return { hasNoObjectives: false, summaryIssues: [], objectives: objectiveIssues };
 }
 
 export async function POST(req: NextRequest) {
