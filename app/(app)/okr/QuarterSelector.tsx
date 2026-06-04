@@ -20,10 +20,12 @@ export default function QuarterSelector({
   quarters,
   selectedQuarterId,
   isLead,
+  basePath = "/okr",
 }: {
   quarters: Quarter[];
   selectedQuarterId: string | null;
   isLead: boolean;
+  basePath?: string;
 }) {
   const [showCreate, setShowCreate] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -36,7 +38,7 @@ export default function QuarterSelector({
   });
 
   function handleSelect(e: React.ChangeEvent<HTMLSelectElement>) {
-    window.location.href = `/okr?quarterId=${e.target.value}`;
+    window.location.href = `${basePath}?quarterId=${e.target.value}`;
   }
 
   async function createQuarter() {
@@ -62,7 +64,7 @@ export default function QuarterSelector({
         startDate: "",
         endDate: "",
       });
-      window.location.href = `/okr?quarterId=${q.id}`;
+      window.location.href = `${basePath}?quarterId=${q.id}`;
     } finally {
       setSaving(false);
     }

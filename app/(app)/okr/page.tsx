@@ -1,7 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import OKRManager from "./OKRManager";
-import DistribusiAnggota from "./DistribusiAnggota";
 import ImportExportSection from "./ImportExportSection";
 import QuarterSelector from "./QuarterSelector";
 import CollapsibleSection from "./CollapsibleSection";
@@ -52,29 +51,6 @@ export default async function OKRPage({ searchParams }: { searchParams: Promise<
     orderBy: { createdAt: "asc" },
   });
 
-  const quarterObjectiveIds = objectives.map((o) => o.id);
-  const teamMembers = isLead
-    ? await prisma.teamMember.findMany({
-        where: { leadId: session!.user.id },
-        include: {
-          assignments: {
-            where: { objectiveId: { in: quarterObjectiveIds } },
-            include: {
-              objective: { select: { id: true, title: true } },
-              krAssignments: {
-                include: {
-                  keyResult: {
-                    select: { id: true, title: true, target: true, unit: true },
-                  },
-                },
-              },
-            },
-          },
-        },
-        orderBy: { name: "asc" },
-      })
-    : [];
-
   const objCount = objectives.length;
   const submittedCount = objectives.filter((o) => o.status === "SUBMITTED").length;
 
@@ -118,29 +94,25 @@ export default async function OKRPage({ searchParams }: { searchParams: Promise<
         </div>
       </CollapsibleSection>
 
-      {/* Bagian 2: Distribusi ke anggota */}
+      {/* Link ke Distribusi Anggota untuk LEAD */}
       {isLead && (
-        <CollapsibleSection
-          title="Distribusi ke Anggota"
-          subtitle={`Assign objective & KR ke anggota, atur bobot dan target individu · ${selectedQuarter.name}`}
-          badge={
-            teamMembers.length > 0 ? (
-              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500">
-                {teamMembers.length} anggota
-              </span>
-            ) : undefined
-          }
-          defaultOpen={true}
+        <a
+          href={`/distribusi?quarterId=${selectedQuarter.id}`}
+          className="flex items-center justify-between bg-white border border-slate-200 rounded-2xl px-5 py-4 hover:border-amber-300 hover:bg-amber-50/30 transition-colors group"
         >
-          <DistribusiAnggota
-            initialMembers={JSON.parse(JSON.stringify(teamMembers))}
-            objectives={JSON.parse(JSON.stringify(objectives))}
-            leadId={session!.user.id}
-            quarterId={selectedQuarter.id}
-            allQuarters={JSON.parse(JSON.stringify(quarters))}
-            leadDivision={session!.user.division ?? undefined}
-          />
-        </CollapsibleSection>
+          <div className="flex items-center gap-3">
+            <span className="text-xl">👥</span>
+            <div>
+              <p className="font-semibold text-slate-800 text-sm group-hover:text-amber-700 transition-colors">
+                Distribusi ke Anggota
+              </p>
+              <p className="text-xs text-slate-400">
+                Assign objective &amp; KR ke anggota, atur bobot dan target individu
+              </p>
+            </div>
+          </div>
+          <span className="text-slate-300 group-hover:text-amber-500 transition-colors text-lg">→</span>
+        </a>
       )}
     </div>
   );

@@ -12,6 +12,7 @@ const memberNav = [
 const leadNav = [
   { href: "/dashboard", label: "Dashboard Divisi", emoji: "📊" },
   { href: "/okr", label: "OKR Divisi", emoji: "🎯" },
+  { href: "/distribusi", label: "Distribusi Anggota", emoji: "👥" },
 ];
 
 const adminNav = [
