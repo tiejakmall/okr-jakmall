@@ -1,5 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { aggregateKRProgress } from "@/lib/calculations";
 import OKRManager from "./OKRManager";
 import ImportExportSection from "./ImportExportSection";
 import QuarterSelector from "./QuarterSelector";
@@ -51,6 +52,19 @@ export default async function OKRPage({ searchParams }: { searchParams: Promise<
     orderBy: { createdAt: "asc" },
   });
 
+  // Aggregate member progress dari KRAssignment ke teamProgress tiap KR
+  const krIds = objectives.flatMap((o) => o.keyResults.map((kr) => kr.id));
+  const allKRAssignments = krIds.length > 0
+    ? await prisma.kRAssignment.findMany({
+        where: { keyResultId: { in: krIds } },
+        select: { keyResultId: true, weight: true, progress: true, target: true },
+      })
+    : [];
+  const enrichedObjectives = aggregateKRProgress(
+    JSON.parse(JSON.stringify(objectives)),
+    allKRAssignments
+  );
+
   const objCount = objectives.length;
   const submittedCount = objectives.filter((o) => o.status === "SUBMITTED").length;
 
@@ -77,7 +91,7 @@ export default async function OKRPage({ searchParams }: { searchParams: Promise<
         defaultOpen={true}
       >
         <OKRManager
-          initialObjectives={JSON.parse(JSON.stringify(objectives))}
+          initialObjectives={enrichedObjectives}
           quarterId={selectedQuarter.id}
           userId={session!.user.id}
           allQuarters={JSON.parse(JSON.stringify(quarters))}

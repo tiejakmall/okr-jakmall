@@ -791,7 +791,7 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
 
                           {isLead ? (
                             <div className="flex items-center gap-2 mb-2">
-                              <span className="text-xs font-medium text-blue-600 flex-shrink-0">📝 Kontribusi saya</span>
+                              <span className="text-xs font-medium text-blue-600 flex-shrink-0">📝 Kontribusi Lead Divisi</span>
                               <input
                                 type="number"
                                 className="w-20 border border-blue-200 rounded-lg px-2 py-1 text-xs text-right bg-blue-50 focus:outline-none focus:border-blue-400"
@@ -818,7 +818,8 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
                             </div>
                           ) : (
                             <p className="text-xs text-slate-400 italic mb-2">
-                              💡 Progress diisi oleh anggota di bagian Distribusi Anggota ↓
+                              💡 Progress anggota diisi di halaman{" "}
+                              <a href="/distribusi" className="text-amber-600 hover:underline font-semibold">Distribusi Anggota →</a>
                             </p>
                           )}
 
