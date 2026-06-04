@@ -2,6 +2,10 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { calcObjectiveAchievement, calcMemberAchievement, aggregateKRProgress } from "@/lib/calculations";
 
+function barFill(v: number) {
+  return v >= 90 ? "#22c55e" : v >= 70 ? "#f59e0b" : "#f87171";
+}
+
 function ach(v: number) {
   if (v >= 100) return `<span style="background:#dcfce7;color:#16a34a;padding:2px 8px;border-radius:5px;font-weight:bold;">${v.toFixed(1)}%</span>`;
   if (v >= 70) return `<span style="background:#fef9c3;color:#b45309;padding:2px 8px;border-radius:5px;font-weight:bold;">${v.toFixed(1)}%</span>`;
@@ -88,6 +92,24 @@ export async function GET(req: Request) {
     .map((m, i) => `<tr><td style="padding:6px 8px;">${i + 1}</td><td style="padding:6px 8px;">${m.name}</td><td style="padding:6px 8px;text-align:center;">${ach(m.achievement)}</td></tr>`)
     .join("");
 
+  const objectiveChartRows = objectives.map((obj, i) => {
+    const v = calcObjectiveAchievement(obj);
+    return `<div class="chart-row">
+      <span class="chart-label">OBJ ${i + 1}: ${obj.title.length > 32 ? obj.title.slice(0, 32) + "…" : obj.title}</span>
+      <div class="chart-track"><div class="chart-fill" style="width:${Math.min(v, 100).toFixed(1)}%;background:${barFill(v)}"></div></div>
+      <span class="chart-pct" style="color:${barFill(v)}">${v.toFixed(1)}%</span>
+    </div>`;
+  }).join("");
+
+  const memberChartRows = memberAchievements.map((m) => {
+    const v = m.achievement;
+    return `<div class="chart-row">
+      <span class="chart-label-sm">${m.name.length > 20 ? m.name.slice(0, 20) + "…" : m.name}</span>
+      <div class="chart-track"><div class="chart-fill" style="width:${Math.min(v, 100).toFixed(1)}%;background:${barFill(v)}"></div></div>
+      <span class="chart-pct" style="color:${barFill(v)}">${v.toFixed(1)}%</span>
+    </div>`;
+  }).join("");
+
   const html = `<!DOCTYPE html>
 <html lang="id">
 <head>
@@ -109,6 +131,12 @@ export async function GET(req: Request) {
     td { border-bottom: 1px solid #f1f5f9; font-size: 11px; }
     .print-btn { margin-bottom: 16px; padding: 8px 18px; background: #fbbf24; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; font-size: 13px; }
     @media print { .print-btn { display: none; } }
+    .chart-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+    .chart-label { font-size: 10px; color: #475569; width: 200px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chart-label-sm { font-size: 10px; color: #475569; width: 130px; flex-shrink: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .chart-track { flex: 1; height: 12px; background: #f1f5f9; border-radius: 6px; overflow: hidden; }
+    .chart-fill { height: 100%; border-radius: 6px; }
+    .chart-pct { font-size: 10px; font-weight: 700; width: 44px; text-align: right; flex-shrink: 0; }
   </style>
 </head>
 <body>
@@ -131,6 +159,12 @@ export async function GET(req: Request) {
     </div>
   </div>
 
+  ${objectives.length > 0 ? `
+  <h2>📊 Visualisasi Capaian Objective</h2>
+  <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;margin-bottom:20px;">
+    ${objectiveChartRows}
+  </div>` : ""}
+
   <h2>🔑 OKR Detail</h2>
   <table>
     <thead>
@@ -151,10 +185,15 @@ export async function GET(req: Request) {
 
   ${memberAchievements.length > 0 ? `
   <h2>🏅 Ranking Anggota</h2>
-  <table style="max-width:400px;">
-    <thead><tr><th style="width:60px">No</th><th>Nama</th><th style="width:120px;text-align:center">Pencapaian</th></tr></thead>
-    <tbody>${memberRows}</tbody>
-  </table>` : ""}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;">
+    <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:14px 16px;">
+      ${memberChartRows}
+    </div>
+    <table>
+      <thead><tr><th style="width:40px">No</th><th>Nama</th><th style="width:110px;text-align:center">Pencapaian</th></tr></thead>
+      <tbody>${memberRows}</tbody>
+    </table>
+  </div>` : ""}
 
   <script>
     // Auto-print only when opened directly (not iframed)
