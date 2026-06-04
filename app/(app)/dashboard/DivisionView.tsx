@@ -22,10 +22,10 @@ type DivisionData = {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function achClass(v: number) {
-  return v >= 100 ? "bg-green-100 text-green-700" : v >= 70 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-600";
+  return v >= 90 ? "bg-green-100 text-green-700" : v >= 70 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-600";
 }
-function achEmoji(v: number) { return v >= 100 ? "🏆" : v >= 70 ? "🔥" : "📉"; }
-function barColor(v: number) { return v >= 100 ? "#22c55e" : v >= 70 ? "#f59e0b" : "#f87171"; }
+function achEmoji(v: number) { return v >= 90 ? "🏆" : v >= 70 ? "🔥" : "📉"; }
+function barColor(v: number) { return v >= 90 ? "#22c55e" : v >= 70 ? "#f59e0b" : "#f87171"; }
 
 function PctBadge({ value }: { value: number }) {
   return (
@@ -37,7 +37,7 @@ function PctBadge({ value }: { value: number }) {
 
 function ProgressBar({ value, size = "md" }: { value: number; size?: "xs" | "sm" | "md" }) {
   const h = size === "xs" ? "h-1" : size === "sm" ? "h-1.5" : "h-2";
-  const bg = value >= 100 ? "bg-green-500" : value >= 70 ? "bg-amber-400" : "bg-red-400";
+  const bg = value >= 90 ? "bg-green-500" : value >= 70 ? "bg-amber-400" : "bg-red-400";
   return (
     <div className={`${h} bg-slate-100 rounded-full overflow-hidden`}>
       <div className={`${h} ${bg} rounded-full transition-all`} style={{ width: `${Math.min(value, 100)}%` }} />

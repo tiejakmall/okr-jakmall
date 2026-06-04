@@ -264,6 +264,37 @@ function AssignmentRow({
   );
 }
 
+// ─── Member achievement calculation ──────────────────────────────────────────
+
+function calcMemberAch(member: Member): number | null {
+  if (member.assignments.length === 0) return null;
+  const totalObjW = member.assignments.reduce((s, a) => s + Number(a.weight), 0);
+  if (totalObjW === 0) return null;
+  let hasData = false;
+  const ach = member.assignments.reduce((s, a) => {
+    if (a.krAssignments.length === 0) return s;
+    const totalKRW = a.krAssignments.reduce((ks, kra) => ks + Number(kra.weight), 0);
+    if (totalKRW === 0) return s;
+    hasData = true;
+    const objAch = a.krAssignments.reduce((ks, kra) => {
+      const kr = kra.keyResult;
+      if (!kr) return ks;
+      const eff = kra.target != null && kra.target > 0 ? kra.target : kr.target;
+      const pct = eff > 0 ? Math.min((kra.progress / eff) * 100, 100) : 0;
+      return ks + (pct * Number(kra.weight)) / totalKRW;
+    }, 0);
+    return s + (objAch * Number(a.weight)) / totalObjW;
+  }, 0);
+  return hasData ? ach : null;
+}
+
+function achBarColor(v: number) {
+  return v >= 90 ? "bg-green-500" : v >= 70 ? "bg-amber-400" : "bg-red-400";
+}
+function achBadgeClass(v: number) {
+  return v >= 90 ? "bg-green-100 text-green-700" : v >= 70 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-600";
+}
+
 // ─── Member card ──────────────────────────────────────────────────────────────
 
 function MemberCard({
@@ -288,6 +319,7 @@ function MemberCard({
   const unassigned = objectives.filter((o) => !assignedObjectiveIds.has(o.id));
   const objOk = Math.abs(totalWeight - 100) < 0.1;
   const initials = member.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
+  const achievement = calcMemberAch(member);
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -306,12 +338,17 @@ function MemberCard({
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          {achievement !== null && (
+            <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${achBadgeClass(achievement)}`}>
+              {achievement.toFixed(1)}%
+            </span>
+          )}
           <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
             objOk ? "bg-green-100 text-green-700"
             : totalWeight > 100 ? "bg-red-100 text-red-600"
             : "bg-slate-100 text-slate-500"
           }`}>
-            {totalWeight}%{objOk ? " ✅" : ""}
+            ⚖️ {totalWeight}%{objOk ? " ✅" : ""}
           </span>
           <span className="text-slate-300">
             {open ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
@@ -329,13 +366,37 @@ function MemberCard({
 
       {open && (
         <>
-          <div className="px-4 py-2 border-t border-slate-100">
-            <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
-              <div
-                className={`h-1 rounded-full transition-all ${totalWeight > 100 ? "bg-red-400" : "bg-amber-400"}`}
-                style={{ width: `${Math.min(totalWeight, 100)}%` }}
-              />
+          <div className="px-4 py-2.5 border-t border-slate-100 space-y-1.5">
+            {/* Bar 1: bobot distribution */}
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-400 w-14 flex-shrink-0">Bobot</span>
+              <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-1.5 rounded-full transition-all ${
+                    objOk ? "bg-green-400" : totalWeight > 100 ? "bg-red-400" : "bg-amber-400"
+                  }`}
+                  style={{ width: `${Math.min(totalWeight, 100)}%` }}
+                />
+              </div>
+              <span className={`text-xs font-semibold w-10 text-right ${
+                objOk ? "text-green-600" : totalWeight > 100 ? "text-red-500" : "text-slate-500"
+              }`}>{totalWeight}%</span>
             </div>
+            {/* Bar 2: achievement */}
+            {achievement !== null && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-400 w-14 flex-shrink-0">Capaian</span>
+                <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className={`h-1.5 rounded-full transition-all ${achBarColor(achievement)}`}
+                    style={{ width: `${Math.min(achievement, 100)}%` }}
+                  />
+                </div>
+                <span className={`text-xs font-semibold w-10 text-right ${achBadgeClass(achievement).split(" ")[1]}`}>
+                  {achievement.toFixed(1)}%
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="p-3 space-y-2">

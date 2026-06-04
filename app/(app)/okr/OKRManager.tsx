@@ -90,12 +90,12 @@ function WeightBar({ objectives }: { objectives: Objective[] }) {
               />
             ))}
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-1.5 mt-1">
             {objectives.map((obj, i) => (
-              <div key={obj.id} className="flex items-center gap-1.5 text-xs">
-                <div className={`w-2.5 h-2.5 rounded-sm ${colors[i % colors.length]}`} />
-                <span className="text-slate-600 break-words">{obj.title}</span>
-                <span className="font-bold text-slate-700">{obj.weight}%</span>
+              <div key={obj.id} className="flex items-start gap-1.5 text-xs min-w-0">
+                <div className={`w-2.5 h-2.5 rounded-sm flex-shrink-0 mt-0.5 ${colors[i % colors.length]}`} />
+                <span className="text-slate-600 break-words flex-1">{obj.title}</span>
+                <span className="font-bold text-slate-700 flex-shrink-0 ml-1">{obj.weight}%</span>
               </div>
             ))}
           </div>
