@@ -1,8 +1,11 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { getSettingsIssues, getCollectionIssues } from "@/lib/reminder-issues";
 import ReminderManager from "./ReminderManager";
 import ScheduleManager from "./ScheduleManager";
+
+export type LeadStatus = "complete" | "incomplete" | "empty";
 
 export default async function RemindersPage() {
   const session = await auth();
@@ -23,22 +26,21 @@ export default async function RemindersPage() {
 
   const leadsWithStatus = await Promise.all(
     leads.map(async (lead) => {
-      if (!activeQuarter) return { ...lead, name: lead.name ?? "-", email: lead.email ?? "", division: lead.division ?? null, hasOKR: false, hasProgress: false };
+      const base = { id: lead.id, name: lead.name ?? "-", email: lead.email ?? "", division: lead.division ?? null };
+      if (!activeQuarter) return { ...base, settingsStatus: "empty" as LeadStatus, collectionStatus: "empty" as LeadStatus };
 
-      const objectiveCount = await prisma.objective.count({ where: { userId: lead.id, quarterId: activeQuarter.id } });
-      const hasOKR = objectiveCount > 0;
-      let hasProgress = false;
+      const [settingsIssues, collectionIssues] = await Promise.all([
+        getSettingsIssues(lead.id, activeQuarter.id),
+        getCollectionIssues(lead.id, activeQuarter.id),
+      ]);
 
-      if (hasOKR) {
-        const objectives = await prisma.objective.findMany({ where: { userId: lead.id, quarterId: activeQuarter.id }, select: { keyResults: { select: { id: true } } } });
-        const krIds = objectives.flatMap((o) => o.keyResults.map((kr) => kr.id));
-        if (krIds.length > 0) {
-          const count = await prisma.kRAssignment.count({ where: { keyResultId: { in: krIds }, progress: { gt: 0 } } });
-          hasProgress = count > 0;
-        }
-      }
+      const toStatus = (issues: typeof settingsIssues): LeadStatus => {
+        if (issues.hasNoObjectives) return "empty";
+        if (issues.summaryIssues.length === 0 && issues.objectives.length === 0) return "complete";
+        return "incomplete";
+      };
 
-      return { id: lead.id, name: lead.name ?? "-", email: lead.email ?? "", division: lead.division ?? null, hasOKR, hasProgress };
+      return { ...base, settingsStatus: toStatus(settingsIssues), collectionStatus: toStatus(collectionIssues) };
     })
   );
 

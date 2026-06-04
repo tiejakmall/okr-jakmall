@@ -3,15 +3,24 @@
 import { useState } from "react";
 
 type Quarter = { id: string; name: string; isActive: boolean };
+type LeadStatus = "complete" | "incomplete" | "empty";
 type Lead = {
   id: string;
   name: string;
   email: string;
   division: string | null;
-  hasOKR: boolean;
-  hasProgress: boolean;
+  settingsStatus: LeadStatus;
+  collectionStatus: LeadStatus;
 };
 type SendResult = { name: string; email: string; status: "sent" | "skipped" | "error"; reason?: string; error?: string };
+
+function StatusBadge({ status }: { status: LeadStatus }) {
+  if (status === "complete")
+    return <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-lg">✅ Lengkap</span>;
+  if (status === "incomplete")
+    return <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg">⚠️ Belum Lengkap</span>;
+  return <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-lg">❌ Belum Buat</span>;
+}
 
 const btnAmber =
   "flex items-center gap-2 bg-amber-400 text-gray-900 font-bold text-sm px-5 py-2.5 rounded-xl " +
@@ -149,7 +158,9 @@ export default function ReminderManager({
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
         <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
           <p className="font-semibold text-slate-700 text-sm">📋 Daftar Lead Divisi ({initialLeads.length} orang)</p>
-          <p className="text-xs text-slate-400 mt-0.5">Reminder akan dikirim ke semua lead di bawah ini.</p>
+          <p className="text-xs text-slate-400 mt-0.5">
+            Reminder hanya dikirim ke yang statusnya <span className="font-semibold text-amber-600">⚠️ Belum Lengkap</span> atau <span className="font-semibold text-red-600">❌ Belum Buat</span>.
+          </p>
         </div>
         {initialLeads.length === 0 ? (
           <div className="p-8 text-center text-slate-400 text-sm">Belum ada Lead Divisi terdaftar.</div>
@@ -160,36 +171,18 @@ export default function ReminderManager({
                 <th className="text-left px-5 py-2.5 font-semibold">Nama</th>
                 <th className="text-left px-5 py-2.5 font-semibold">Email</th>
                 <th className="text-left px-5 py-2.5 font-semibold">Divisi</th>
-                {selectedQuarter && (
-                  <>
-                    <th className="text-center px-3 py-2.5 font-semibold">OKR {selectedQuarter.name}</th>
-                    <th className="text-center px-3 py-2.5 font-semibold">Progress</th>
-                  </>
-                )}
+                <th className="text-center px-3 py-2.5 font-semibold">🎯 Setting OKR</th>
+                <th className="text-center px-3 py-2.5 font-semibold">📋 Pengumpulan</th>
               </tr>
             </thead>
             <tbody>
               {initialLeads.map((lead) => (
                 <tr key={lead.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition">
                   <td className="px-5 py-3 font-medium text-slate-800">{lead.name}</td>
-                  <td className="px-5 py-3 text-slate-500">{lead.email}</td>
+                  <td className="px-5 py-3 text-slate-500 text-xs">{lead.email}</td>
                   <td className="px-5 py-3 text-slate-500">{lead.division ?? "—"}</td>
-                  {selectedQuarter && (
-                    <>
-                      <td className="px-3 py-3 text-center">
-                        {lead.hasOKR
-                          ? <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-lg">✅ Sudah</span>
-                          : <span className="text-xs font-semibold text-red-500 bg-red-50 px-2 py-0.5 rounded-lg">⚠️ Belum</span>
-                        }
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        {lead.hasProgress
-                          ? <span className="text-xs font-semibold text-green-600 bg-green-50 px-2 py-0.5 rounded-lg">✅ Ada</span>
-                          : <span className="text-xs font-semibold text-slate-400 bg-slate-50 px-2 py-0.5 rounded-lg">— Kosong</span>
-                        }
-                      </td>
-                    </>
-                  )}
+                  <td className="px-3 py-3 text-center"><StatusBadge status={lead.settingsStatus} /></td>
+                  <td className="px-3 py-3 text-center"><StatusBadge status={lead.collectionStatus} /></td>
                 </tr>
               ))}
             </tbody>
