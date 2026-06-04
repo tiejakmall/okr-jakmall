@@ -1,7 +1,9 @@
+import { after } from "next/server";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSettingsIssues, getCollectionIssues } from "@/lib/reminder-issues";
+import { processDueSchedules } from "@/lib/process-schedules";
 import ReminderManager from "./ReminderManager";
 import ScheduleManager from "./ScheduleManager";
 
@@ -10,6 +12,9 @@ export type LeadStatus = "complete" | "incomplete" | "empty";
 export default async function RemindersPage() {
   const session = await auth();
   if (session?.user.role !== "ADMIN") redirect("/dashboard");
+
+  // Fire any due schedules in background after page renders — no cron needed
+  after(processDueSchedules);
 
   const quarters = await prisma.quarter.findMany({
     orderBy: [{ year: "desc" }, { quarter: "desc" }],
