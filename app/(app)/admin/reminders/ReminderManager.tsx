@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 type Quarter = { id: string; name: string; isActive: boolean };
 type LeadStatus = "complete" | "incomplete" | "empty";
@@ -42,10 +42,26 @@ export default function ReminderManager({
 }) {
   const activeQuarter = quarters.find((q) => q.isActive) ?? quarters[0];
   const [selectedQuarterId, setSelectedQuarterId] = useState(activeQuarter?.id ?? "");
+  const [leads, setLeads] = useState<Lead[]>(initialLeads);
+  const [loadingLeads, setLoadingLeads] = useState(false);
   const [sending, setSending] = useState<"settings" | "collection" | null>(null);
   const [result, setResult] = useState<{ type: "settings" | "collection"; message: string; results: SendResult[]; success: boolean } | null>(null);
 
   const selectedQuarter = quarters.find((q) => q.id === selectedQuarterId);
+
+  useEffect(() => {
+    if (!selectedQuarterId) return;
+    // Active quarter already loaded from server, skip initial fetch
+    if (selectedQuarterId === (activeQuarter?.id ?? "")) {
+      setLeads(initialLeads);
+      return;
+    }
+    setLoadingLeads(true);
+    fetch(`/api/admin/lead-statuses?quarterId=${selectedQuarterId}`)
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setLeads(data); })
+      .finally(() => setLoadingLeads(false));
+  }, [selectedQuarterId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function sendReminder(type: "settings" | "collection") {
     if (!selectedQuarterId) return;
@@ -156,13 +172,16 @@ export default function ReminderManager({
 
       {/* Lead list */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-          <p className="font-semibold text-slate-700 text-sm">📋 Daftar Lead Divisi ({initialLeads.length} orang)</p>
-          <p className="text-xs text-slate-400 mt-0.5">
-            Reminder hanya dikirim ke yang statusnya <span className="font-semibold text-amber-600">⚠️ Belum Lengkap</span> atau <span className="font-semibold text-red-600">❌ Belum Buat</span>.
-          </p>
+        <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <p className="font-semibold text-slate-700 text-sm">📋 Daftar Lead Divisi ({leads.length} orang)</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Reminder hanya dikirim ke yang statusnya <span className="font-semibold text-amber-600">⚠️ Belum Lengkap</span> atau <span className="font-semibold text-red-600">❌ Belum Buat</span>.
+            </p>
+          </div>
+          {loadingLeads && <span className="text-xs text-slate-400 animate-pulse">Memuat status...</span>}
         </div>
-        {initialLeads.length === 0 ? (
+        {leads.length === 0 ? (
           <div className="p-8 text-center text-slate-400 text-sm">Belum ada Lead Divisi terdaftar.</div>
         ) : (
           <table className="w-full text-sm">
@@ -175,8 +194,8 @@ export default function ReminderManager({
                 <th className="text-center px-3 py-2.5 font-semibold">📋 Pengumpulan</th>
               </tr>
             </thead>
-            <tbody>
-              {initialLeads.map((lead) => (
+            <tbody className={loadingLeads ? "opacity-40 pointer-events-none" : ""}>
+              {leads.map((lead) => (
                 <tr key={lead.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition">
                   <td className="px-5 py-3 font-medium text-slate-800">{lead.name}</td>
                   <td className="px-5 py-3 text-slate-500 text-xs">{lead.email}</td>
