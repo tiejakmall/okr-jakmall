@@ -11,7 +11,19 @@ async function getSettingsIssues(leadId: string, quarterId: string): Promise<Com
       title: true,
       status: true,
       keyResults: {
-        select: { id: true, title: true, weight: true, target: true, unit: true },
+        select: {
+          id: true,
+          title: true,
+          weight: true,
+          target: true,
+          unit: true,
+          krAssignments: {
+            select: {
+              weight: true,
+              assignment: { select: { member: { select: { name: true } } } },
+            },
+          },
+        },
       },
     },
   });
@@ -24,11 +36,20 @@ async function getSettingsIssues(leadId: string, quarterId: string): Promise<Com
     const issues: string[] = [];
     if (obj.status === "DRAFT") issues.push("Belum dikumpulkan (masih Draft)");
 
-    const totalWeight = obj.keyResults.reduce((s, kr) => s + kr.weight, 0);
-    if (obj.keyResults.length > 0 && Math.abs(totalWeight - 100) > 0.1) {
-      issues.push(`Total bobot KR: ${totalWeight}% (harus 100%)`);
+    // No KRs at all
+    if (obj.keyResults.length === 0) {
+      issues.push("Belum ada Key Result yang dibuat");
+      objectiveIssues.push({ title: obj.title, issues, krIssues: [] });
+      continue;
     }
 
+    // Total KR weight check
+    const totalWeight = obj.keyResults.reduce((s, kr) => s + kr.weight, 0);
+    if (Math.abs(totalWeight - 100) > 0.1) {
+      issues.push(`Total bobot KR: ${totalWeight.toFixed(0)}% (harus 100%)`);
+    }
+
+    // Per-KR field checks
     const krIssues = obj.keyResults.flatMap((kr) => {
       const krIss: string[] = [];
       if (kr.weight === 0) krIss.push("bobot 0%");
@@ -36,6 +57,20 @@ async function getSettingsIssues(leadId: string, quarterId: string): Promise<Com
       if (!kr.unit || kr.unit.trim() === "") krIss.push("satuan belum dipilih");
       return krIss.length > 0 ? [{ title: kr.title, issues: krIss }] : [];
     });
+
+    // Per-member bobot check (sum of KRAssignment weights per member should = 100%)
+    const memberWeightMap = new Map<string, number>();
+    for (const kr of obj.keyResults) {
+      for (const kra of kr.krAssignments) {
+        const name = kra.assignment.member.name;
+        memberWeightMap.set(name, (memberWeightMap.get(name) ?? 0) + kra.weight);
+      }
+    }
+    for (const [memberName, totalBobot] of memberWeightMap.entries()) {
+      if (Math.abs(totalBobot - 100) > 0.1) {
+        issues.push(`Bobot ${memberName}: ${totalBobot.toFixed(0)}% (harus 100%)`);
+      }
+    }
 
     if (issues.length > 0 || krIssues.length > 0) {
       objectiveIssues.push({ title: obj.title, issues, krIssues });
