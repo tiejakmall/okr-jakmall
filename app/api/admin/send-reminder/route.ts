@@ -144,7 +144,6 @@ async function getCollectionIssues(leadId: string, quarterId: string): Promise<C
           weight: true,
           target: true,
           unit: true,
-          teamProgress: true,
           krAssignments: {
             select: {
               weight: true,
@@ -205,9 +204,6 @@ async function getCollectionIssues(leadId: string, quarterId: string): Promise<C
       if (kr.weight === 0) krIss.push("bobot 0%");
       if (kr.target === 0) krIss.push("target belum diisi");
       if (!kr.unit || kr.unit.trim() === "") krIss.push("satuan belum dipilih");
-
-      // Hasil fields
-      if (kr.teamProgress === 0) krIss.push("progress tim 0%");
 
       // Per-member progress
       const emptyMembers = kr.krAssignments
