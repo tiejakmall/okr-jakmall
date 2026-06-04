@@ -70,7 +70,7 @@ function RadarObjectivesChart({ objectives }: { objectives: ObjData[] }) {
           <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: "#64748b" }} />
           <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 9, fill: "#94a3b8" }} tickFormatter={(v) => `${v}%`} />
           <Radar dataKey="value" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.25} strokeWidth={2} />
-          <Tooltip formatter={(v: unknown) => `${(v as number).toFixed(1)}%`} />
+          <Tooltip formatter={(v: unknown) => `${(v as number).toFixed(1)}%`} contentStyle={{ fontSize: "11px", padding: "4px 10px", borderRadius: "8px", border: "1px solid #e2e8f0" }} />
         </RadarChart>
       </ResponsiveContainer>
       <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
@@ -96,7 +96,7 @@ function BarObjectivesChart({ objectives }: { objectives: ObjData[] }) {
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
           <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} />
           <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#94a3b8" }} tickFormatter={(v) => `${v}%`} width={38} />
-          <Tooltip formatter={(v: unknown) => `${(v as number).toFixed(1)}%`} labelFormatter={(_, p) => p[0]?.payload?.title ?? ""} />
+          <Tooltip formatter={(v: unknown) => `${(v as number).toFixed(1)}%`} labelFormatter={(_, p) => p[0]?.payload?.title ?? ""} contentStyle={{ fontSize: "11px", padding: "4px 10px", borderRadius: "8px", border: "1px solid #e2e8f0" }} />
           <Bar dataKey="pct" name="Capaian" radius={[6, 6, 0, 0]} maxBarSize={60}>
             {data.map((d, i) => <Cell key={i} fill={barColor(d.pct)} />)}
           </Bar>
@@ -121,7 +121,7 @@ function DonutObjectivesChart({ objectives, divisionAchievement }: { objectives:
             <Pie data={data} cx="50%" cy="50%" innerRadius={65} outerRadius={95} dataKey="value" paddingAngle={3}>
               {data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
             </Pie>
-            <Tooltip formatter={(v: unknown, _: unknown, p: { payload?: { achievement?: number; title?: string } }) => [`${v}% bobot · ${(p.payload?.achievement ?? 0).toFixed(1)}% capaian`, p.payload?.title ?? ""]} />
+            <Tooltip formatter={(v: unknown, _: unknown, p: { payload?: { achievement?: number; title?: string } }) => [`${v}% bobot · ${(p.payload?.achievement ?? 0).toFixed(1)}% capaian`, p.payload?.title ?? ""]} contentStyle={{ fontSize: "11px", padding: "4px 10px", borderRadius: "8px", border: "1px solid #e2e8f0" }} />
           </PieChart>
         </ResponsiveContainer>
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -143,29 +143,7 @@ function DonutObjectivesChart({ objectives, divisionAchievement }: { objectives:
   );
 }
 
-// ─── Chart 4: Member horizontal bar ──────────────────────────────────────────
-
-function MemberBarChart({ members }: { members: MemberData[] }) {
-  if (members.length === 0) return null;
-  const data = [...members]
-    .sort((a, b) => b.achievement - a.achievement)
-    .map((m) => ({ name: m.name.split(" ")[0], fullName: m.name, pct: parseFloat(m.achievement.toFixed(1)) }));
-  return (
-    <ResponsiveContainer width="100%" height={Math.max(180, data.length * 52)}>
-      <BarChart data={data} layout="vertical" margin={{ top: 0, right: 45, left: 10, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-        <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10, fill: "#94a3b8" }} tickFormatter={(v) => `${v}%`} />
-        <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} width={70} />
-        <Tooltip formatter={(v: unknown) => `${(v as number).toFixed(1)}%`} labelFormatter={(_, p) => p[0]?.payload?.fullName ?? ""} />
-        <Bar dataKey="pct" name="Capaian" radius={[0, 6, 6, 0]} maxBarSize={28}>
-          {data.map((d, i) => <Cell key={i} fill={barColor(d.pct)} />)}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
-
-// ─── Chart 5: Stacked bar member per KR ──────────────────────────────────────
+// ─── Chart 4: Stacked bar member per KR ──────────────────────────────────────
 
 function MemberStackedChart({ keyResults }: { keyResults: KRData[] }) {
   const krsWithContribs = keyResults.filter((kr) => kr.memberContributions.length > 0);
@@ -192,7 +170,7 @@ function MemberStackedChart({ keyResults }: { keyResults: KRData[] }) {
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
           <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#64748b" }} />
           <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#94a3b8" }} tickFormatter={(v) => `${v}%`} width={35} />
-          <Tooltip formatter={(v: unknown, name: unknown) => [`${(v as number).toFixed(1)}%`, name as string]} labelFormatter={(_, p) => p[0]?.payload?.fullName ?? ""} />
+          <Tooltip formatter={(v: unknown, name: unknown) => [`${(v as number).toFixed(1)}%`, name as string]} labelFormatter={(_, p) => p[0]?.payload?.fullName ?? ""} contentStyle={{ fontSize: "11px", padding: "4px 10px", borderRadius: "8px", border: "1px solid #e2e8f0" }} />
           <Legend wrapperStyle={{ fontSize: "11px" }} />
           {allMembers.map((m, i) => (
             <Bar key={m.id} dataKey={m.name} stackId="a" fill={PALETTE[i % PALETTE.length]}
@@ -523,13 +501,7 @@ export default function DivisionView({ quarters, leadId, divisionName, defaultQu
                 <h2 className="font-bold text-slate-700 text-sm">🏅 Ranking Pencapaian Anggota</h2>
               </div>
 
-              {/* Bar chart */}
-              <div className="px-5 pt-4 pb-2">
-                <MemberBarChart members={data.members} />
-              </div>
-
-              {/* Leaderboard list */}
-              <div className="divide-y divide-slate-50 border-t border-slate-100 mt-2">
+              <div className="divide-y divide-slate-50">
                 {[...data.members]
                   .sort((a, b) => b.achievement - a.achievement)
                   .map((m, idx) => {
