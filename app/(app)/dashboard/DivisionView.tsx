@@ -2,6 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import {
+  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell,
+  PieChart, Pie,
+  ResponsiveContainer,
+} from "recharts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -18,6 +24,10 @@ type MemberData = { id: string; name: string; achievement: number };
 type DivisionData = {
   objectives: ObjData[]; members: MemberData[]; divisionAchievement: number;
 };
+
+// ─── Constants ───────────────────────────────────────────────────────────────
+
+const PALETTE = ["#f59e0b", "#3b82f6", "#8b5cf6", "#ec4899", "#06b6d4", "#10b981", "#f97316", "#84cc16"];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -41,6 +51,155 @@ function ProgressBar({ value, size = "md" }: { value: number; size?: "xs" | "sm"
   return (
     <div className={`${h} bg-slate-100 rounded-full overflow-hidden`}>
       <div className={`${h} ${bg} rounded-full transition-all`} style={{ width: `${Math.min(value, 100)}%` }} />
+    </div>
+  );
+}
+
+// ─── Chart 1: Radar per Objective ────────────────────────────────────────────
+
+function RadarObjectivesChart({ objectives }: { objectives: ObjData[] }) {
+  if (objectives.length < 3) return null;
+  const data = objectives.map((o, i) => ({ subject: `OBJ ${i + 1}`, value: parseFloat(o.achievement.toFixed(1)), fullMark: 100 }));
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">🕸️ Radar Objective</p>
+      <p className="text-xs text-slate-400 mb-3">Keseimbangan capaian antar objective</p>
+      <ResponsiveContainer width="100%" height={260}>
+        <RadarChart data={data} margin={{ top: 10, right: 20, bottom: 10, left: 20 }}>
+          <PolarGrid stroke="#e2e8f0" />
+          <PolarAngleAxis dataKey="subject" tick={{ fontSize: 11, fill: "#64748b" }} />
+          <PolarRadiusAxis angle={30} domain={[0, 100]} tick={{ fontSize: 9, fill: "#94a3b8" }} tickFormatter={(v) => `${v}%`} />
+          <Radar dataKey="value" stroke="#f59e0b" fill="#f59e0b" fillOpacity={0.25} strokeWidth={2} />
+          <Tooltip formatter={(v: unknown) => `${(v as number).toFixed(1)}%`} />
+        </RadarChart>
+      </ResponsiveContainer>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+        {objectives.map((o, i) => (
+          <p key={o.id} className="text-xs text-slate-500"><span className="font-semibold text-slate-700">OBJ {i + 1}:</span> {o.title.length > 28 ? o.title.slice(0, 28) + "…" : o.title}</p>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Chart 2: Bar per Objective ───────────────────────────────────────────────
+
+function BarObjectivesChart({ objectives }: { objectives: ObjData[] }) {
+  if (objectives.length === 0) return null;
+  const data = objectives.map((o, i) => ({ name: `OBJ ${i + 1}`, pct: parseFloat(o.achievement.toFixed(1)), title: o.title }));
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">📊 Capaian per Objective</p>
+      <p className="text-xs text-slate-400 mb-3">Perbandingan % capaian tiap objective</p>
+      <ResponsiveContainer width="100%" height={220}>
+        <BarChart data={data} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+          <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} />
+          <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#94a3b8" }} tickFormatter={(v) => `${v}%`} width={38} />
+          <Tooltip formatter={(v: unknown) => `${(v as number).toFixed(1)}%`} labelFormatter={(_, p) => p[0]?.payload?.title ?? ""} />
+          <Bar dataKey="pct" name="Capaian" radius={[6, 6, 0, 0]} maxBarSize={60}>
+            {data.map((d, i) => <Cell key={i} fill={barColor(d.pct)} />)}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+// ─── Chart 3: Donut komposisi bobot ───────────────────────────────────────────
+
+function DonutObjectivesChart({ objectives, divisionAchievement }: { objectives: ObjData[]; divisionAchievement: number }) {
+  if (objectives.length === 0) return null;
+  const data = objectives.map((o, i) => ({ name: `OBJ ${i + 1}`, value: o.weight, achievement: o.achievement, title: o.title }));
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 p-5">
+      <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1">🍩 Komposisi Bobot</p>
+      <p className="text-xs text-slate-400 mb-3">Proporsi bobot tiap objective</p>
+      <div className="relative">
+        <ResponsiveContainer width="100%" height={220}>
+          <PieChart>
+            <Pie data={data} cx="50%" cy="50%" innerRadius={65} outerRadius={95} dataKey="value" paddingAngle={3}>
+              {data.map((_, i) => <Cell key={i} fill={PALETTE[i % PALETTE.length]} />)}
+            </Pie>
+            <Tooltip formatter={(v: unknown, _: unknown, p: { payload?: { achievement?: number; title?: string } }) => [`${v}% bobot · ${(p.payload?.achievement ?? 0).toFixed(1)}% capaian`, p.payload?.title ?? ""]} />
+          </PieChart>
+        </ResponsiveContainer>
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-slate-800">{divisionAchievement.toFixed(1)}%</p>
+            <p className="text-xs text-slate-400">Divisi</p>
+          </div>
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
+        {data.map((d, i) => (
+          <div key={i} className="flex items-center gap-1.5 text-xs text-slate-600">
+            <div className="w-2.5 h-2.5 rounded-sm flex-shrink-0" style={{ backgroundColor: PALETTE[i % PALETTE.length] }} />
+            <span>{d.name} ({d.value}%)</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Chart 4: Member horizontal bar ──────────────────────────────────────────
+
+function MemberBarChart({ members }: { members: MemberData[] }) {
+  if (members.length === 0) return null;
+  const data = [...members]
+    .sort((a, b) => b.achievement - a.achievement)
+    .map((m) => ({ name: m.name.split(" ")[0], fullName: m.name, pct: parseFloat(m.achievement.toFixed(1)) }));
+  return (
+    <ResponsiveContainer width="100%" height={Math.max(180, data.length * 52)}>
+      <BarChart data={data} layout="vertical" margin={{ top: 0, right: 45, left: 10, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
+        <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10, fill: "#94a3b8" }} tickFormatter={(v) => `${v}%`} />
+        <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: "#64748b" }} width={70} />
+        <Tooltip formatter={(v: unknown) => `${(v as number).toFixed(1)}%`} labelFormatter={(_, p) => p[0]?.payload?.fullName ?? ""} />
+        <Bar dataKey="pct" name="Capaian" radius={[0, 6, 6, 0]} maxBarSize={28}>
+          {data.map((d, i) => <Cell key={i} fill={barColor(d.pct)} />)}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+// ─── Chart 5: Stacked bar member per KR ──────────────────────────────────────
+
+function MemberStackedChart({ keyResults }: { keyResults: KRData[] }) {
+  const krsWithContribs = keyResults.filter((kr) => kr.memberContributions.length > 0);
+  if (krsWithContribs.length === 0) return null;
+
+  const allMembers = Array.from(
+    new Map(krsWithContribs.flatMap((kr) => kr.memberContributions.map((c) => [c.memberId, c.memberName]))).entries()
+  ).map(([id, name]) => ({ id, name }));
+
+  const data = krsWithContribs.map((kr, i) => {
+    const entry: Record<string, number | string> = { name: `KR ${i + 1}`, fullName: kr.title };
+    allMembers.forEach((m) => {
+      const c = kr.memberContributions.find((c) => c.memberId === m.id);
+      entry[m.name] = kr.target > 0 && c ? parseFloat(Math.min((c.progress / kr.target) * 100, 100).toFixed(1)) : 0;
+    });
+    return entry;
+  });
+
+  return (
+    <div className="mt-5 pt-5 border-t border-slate-100">
+      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">📊 Kontribusi Anggota per KR</p>
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={data} margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+          <XAxis dataKey="name" tick={{ fontSize: 10, fill: "#64748b" }} />
+          <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: "#94a3b8" }} tickFormatter={(v) => `${v}%`} width={35} />
+          <Tooltip formatter={(v: unknown, name: unknown) => [`${(v as number).toFixed(1)}%`, name as string]} labelFormatter={(_, p) => p[0]?.payload?.fullName ?? ""} />
+          <Legend wrapperStyle={{ fontSize: "11px" }} />
+          {allMembers.map((m, i) => (
+            <Bar key={m.id} dataKey={m.name} stackId="a" fill={PALETTE[i % PALETTE.length]}
+              radius={i === allMembers.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]} maxBarSize={48} />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   );
 }
@@ -153,6 +312,9 @@ function ObjectiveSection({ obj, index }: { obj: ObjData; index: number }) {
 
         {/* KR Chart */}
         <KRChart keyResults={obj.keyResults} />
+
+        {/* Stacked member chart */}
+        <MemberStackedChart keyResults={obj.keyResults} />
 
         {/* Member contribution toggle */}
         {obj.keyResults.some((kr) => kr.memberContributions.length > 0) && (
@@ -329,20 +491,45 @@ export default function DivisionView({ quarters, leadId, divisionName, defaultQu
 
       {!loading && data && (
         <>
-          {/* Objective cards */}
+          {/* ── Charts Overview ── */}
+          {data.objectives.length > 0 && (
+            <div className="space-y-4">
+              {/* Row 1: Radar + Donut side by side (only when ≥3 objectives) */}
+              {data.objectives.length >= 3 ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <RadarObjectivesChart objectives={data.objectives} />
+                  <DonutObjectivesChart objectives={data.objectives} divisionAchievement={data.divisionAchievement} />
+                </div>
+              ) : (
+                <DonutObjectivesChart objectives={data.objectives} divisionAchievement={data.divisionAchievement} />
+              )}
+
+              {/* Row 2: Bar per objective (full width) */}
+              <BarObjectivesChart objectives={data.objectives} />
+            </div>
+          )}
+
+          {/* ── Objective cards ── */}
           <div className="space-y-5">
             {data.objectives.map((obj, i) => (
               <ObjectiveSection key={obj.id} obj={obj} index={i} />
             ))}
           </div>
 
-          {/* Member ranking */}
+          {/* ── Member ranking ── */}
           {data.members.length > 0 && (
             <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
               <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
                 <h2 className="font-bold text-slate-700 text-sm">🏅 Ranking Pencapaian Anggota</h2>
               </div>
-              <div className="divide-y divide-slate-50">
+
+              {/* Bar chart */}
+              <div className="px-5 pt-4 pb-2">
+                <MemberBarChart members={data.members} />
+              </div>
+
+              {/* Leaderboard list */}
+              <div className="divide-y divide-slate-50 border-t border-slate-100 mt-2">
                 {[...data.members]
                   .sort((a, b) => b.achievement - a.achievement)
                   .map((m, idx) => {
@@ -356,9 +543,7 @@ export default function DivisionView({ quarters, leadId, divisionName, defaultQu
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-slate-800 text-sm">{m.name}</p>
-                          <div className="mt-1">
-                            <ProgressBar value={m.achievement} size="xs" />
-                          </div>
+                          <div className="mt-1"><ProgressBar value={m.achievement} size="xs" /></div>
                         </div>
                         <PctBadge value={m.achievement} />
                       </div>
