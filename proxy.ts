@@ -4,6 +4,7 @@ import { getToken } from "next-auth/jwt";
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isLoginPage = pathname === "/login" || pathname.startsWith("/login/");
+  const isSetupPage = pathname === "/setup";
 
   const token = await getToken({
     req: request,
@@ -17,8 +18,8 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
-  // Not logged in → send to login (unless already there)
-  if (!token && !isLoginPage) {
+  // Not logged in → send to login (unless already there or on setup page)
+  if (!token && !isLoginPage && !isSetupPage) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

@@ -1,228 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { sendReminderEmail, type ReminderType, type CompletionIssues, type ObjectiveIssue } from "@/lib/email";
-
-async function getSettingsIssues(leadId: string, quarterId: string): Promise<CompletionIssues> {
-  const objectives = await prisma.objective.findMany({
-    where: { userId: leadId, quarterId },
-    select: {
-      id: true,
-      title: true,
-      weight: true,
-      status: true,
-      keyResults: {
-        select: {
-          id: true,
-          title: true,
-          weight: true,
-          target: true,
-          unit: true,
-          krAssignments: {
-            select: {
-              weight: true,
-              assignment: { select: { member: { select: { name: true } } } },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (objectives.length === 0) return { hasNoObjectives: true, summaryIssues: [], objectives: [] };
-
-  const summaryIssues: string[] = [];
-
-  // Total objective weight should sum to 100%
-  const totalObjWeight = objectives.reduce((s, obj) => s + obj.weight, 0);
-  if (Math.abs(totalObjWeight - 100) > 0.1) {
-    summaryIssues.push(`Total bobot semua Objective: ${totalObjWeight.toFixed(0)}% (harus 100%)`);
-  }
-
-  const objectiveIssues: ObjectiveIssue[] = [];
-
-  for (const obj of objectives) {
-    const issues: string[] = [];
-    if (obj.status === "DRAFT") issues.push("Belum dikumpulkan (masih Draft)");
-
-    // No KRs at all
-    if (obj.keyResults.length === 0) {
-      issues.push("Belum ada Key Result yang dibuat");
-      objectiveIssues.push({ title: obj.title, issues, krIssues: [] });
-      continue;
-    }
-
-    // Total KR weight check
-    const totalWeight = obj.keyResults.reduce((s, kr) => s + kr.weight, 0);
-    if (Math.abs(totalWeight - 100) > 0.1) {
-      issues.push(`Total bobot KR: ${totalWeight.toFixed(0)}% (harus 100%)`);
-    }
-
-    // Per-KR field checks
-    const krIssues = obj.keyResults.flatMap((kr) => {
-      const krIss: string[] = [];
-      if (kr.weight === 0) krIss.push("bobot 0%");
-      if (kr.target === 0) krIss.push("target belum diisi");
-      if (!kr.unit || kr.unit.trim() === "") krIss.push("satuan belum dipilih");
-      return krIss.length > 0 ? [{ title: kr.title, issues: krIss }] : [];
-    });
-
-    // Per-member bobot check (sum of KRAssignment weights per member should = 100%)
-    const memberWeightMap = new Map<string, number>();
-    for (const kr of obj.keyResults) {
-      for (const kra of kr.krAssignments) {
-        const name = kra.assignment.member.name;
-        memberWeightMap.set(name, (memberWeightMap.get(name) ?? 0) + kra.weight);
-      }
-    }
-    for (const [memberName, totalBobot] of memberWeightMap.entries()) {
-      if (Math.abs(totalBobot - 100) > 0.1) {
-        issues.push(`Bobot ${memberName}: ${totalBobot.toFixed(0)}% (harus 100%)`);
-      }
-    }
-
-    if (issues.length > 0 || krIssues.length > 0) {
-      objectiveIssues.push({ title: obj.title, issues, krIssues });
-    }
-  }
-
-  return { hasNoObjectives: false, summaryIssues, objectives: objectiveIssues };
-}
-
-async function getResultsIssues(leadId: string, quarterId: string): Promise<CompletionIssues> {
-  const objectives = await prisma.objective.findMany({
-    where: { userId: leadId, quarterId },
-    select: {
-      id: true,
-      title: true,
-      keyResults: {
-        select: {
-          id: true,
-          title: true,
-          krAssignments: {
-            select: {
-              progress: true,
-              assignment: { select: { member: { select: { name: true } } } },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (objectives.length === 0) return { hasNoObjectives: true, summaryIssues: [], objectives: [] };
-
-  const objectiveIssues: ObjectiveIssue[] = [];
-
-  for (const obj of objectives) {
-    const krIssues = obj.keyResults.flatMap((kr) => {
-      const empty = kr.krAssignments.filter((a) => a.progress === 0);
-      if (empty.length === 0) return [];
-      const names = empty.map((a) => a.assignment.member.name).join(", ");
-      return [{ title: kr.title, issues: [`${empty.length} anggota belum isi progress: ${names}`] }];
-    });
-
-    if (krIssues.length > 0) {
-      objectiveIssues.push({ title: obj.title, issues: [], krIssues });
-    }
-  }
-
-  return { hasNoObjectives: false, summaryIssues: [], objectives: objectiveIssues };
-}
-
-async function getCollectionIssues(leadId: string, quarterId: string): Promise<CompletionIssues> {
-  const objectives = await prisma.objective.findMany({
-    where: { userId: leadId, quarterId },
-    select: {
-      id: true,
-      title: true,
-      weight: true,
-      keyResults: {
-        select: {
-          id: true,
-          title: true,
-          weight: true,
-          target: true,
-          unit: true,
-          krAssignments: {
-            select: {
-              weight: true,
-              progress: true,
-              assignment: { select: { member: { select: { name: true } } } },
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (objectives.length === 0) return { hasNoObjectives: true, summaryIssues: [], objectives: [] };
-
-  const summaryIssues: string[] = [];
-
-  const totalObjWeight = objectives.reduce((s, obj) => s + obj.weight, 0);
-  if (Math.abs(totalObjWeight - 100) > 0.1) {
-    summaryIssues.push(`Total bobot semua Objective: ${totalObjWeight.toFixed(0)}% (harus 100%)`);
-  }
-
-  const objectiveIssues: ObjectiveIssue[] = [];
-
-  for (const obj of objectives) {
-    const issues: string[] = [];
-
-    if (obj.keyResults.length === 0) {
-      issues.push("Belum ada Key Result yang dibuat");
-      objectiveIssues.push({ title: obj.title, issues, krIssues: [] });
-      continue;
-    }
-
-    // Total KR weight
-    const totalKRWeight = obj.keyResults.reduce((s, kr) => s + kr.weight, 0);
-    if (Math.abs(totalKRWeight - 100) > 0.1) {
-      issues.push(`Total bobot KR: ${totalKRWeight.toFixed(0)}% (harus 100%)`);
-    }
-
-    // Per-member bobot
-    const memberWeightMap = new Map<string, number>();
-    for (const kr of obj.keyResults) {
-      for (const kra of kr.krAssignments) {
-        const name = kra.assignment.member.name;
-        memberWeightMap.set(name, (memberWeightMap.get(name) ?? 0) + kra.weight);
-      }
-    }
-    for (const [memberName, totalBobot] of memberWeightMap.entries()) {
-      if (Math.abs(totalBobot - 100) > 0.1) {
-        issues.push(`Bobot ${memberName}: ${totalBobot.toFixed(0)}% (harus 100%)`);
-      }
-    }
-
-    // Per-KR checks: setup + hasil
-    const krIssues = obj.keyResults.flatMap((kr) => {
-      const krIss: string[] = [];
-
-      // Setup fields
-      if (kr.weight === 0) krIss.push("bobot 0%");
-      if (kr.target === 0) krIss.push("target belum diisi");
-      if (!kr.unit || kr.unit.trim() === "") krIss.push("satuan belum dipilih");
-
-      // Per-member progress
-      const emptyMembers = kr.krAssignments
-        .filter((a) => a.progress === 0)
-        .map((a) => a.assignment.member.name);
-      if (emptyMembers.length > 0) {
-        krIss.push(`progress belum diisi: ${emptyMembers.join(", ")}`);
-      }
-
-      return krIss.length > 0 ? [{ title: kr.title, issues: krIss }] : [];
-    });
-
-    if (issues.length > 0 || krIssues.length > 0) {
-      objectiveIssues.push({ title: obj.title, issues, krIssues });
-    }
-  }
-
-  return { hasNoObjectives: false, summaryIssues, objectives: objectiveIssues };
-}
+import { sendReminderEmail, type ReminderType } from "@/lib/email";
+import { getSettingsIssues, getCollectionIssues } from "@/lib/reminder-issues";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -237,9 +17,7 @@ export async function POST(req: NextRequest) {
   }
 
   const quarter = await prisma.quarter.findUnique({ where: { id: quarterId } });
-  if (!quarter) {
-    return NextResponse.json({ error: "Quarter tidak ditemukan." }, { status: 404 });
-  }
+  if (!quarter) return NextResponse.json({ error: "Quarter tidak ditemukan." }, { status: 404 });
 
   const leads = await prisma.user.findMany({
     where: { role: "LEAD" },
@@ -247,9 +25,7 @@ export async function POST(req: NextRequest) {
     orderBy: { name: "asc" },
   });
 
-  if (leads.length === 0) {
-    return NextResponse.json({ error: "Tidak ada Lead Divisi yang terdaftar." }, { status: 404 });
-  }
+  if (leads.length === 0) return NextResponse.json({ error: "Tidak ada Lead Divisi yang terdaftar." }, { status: 404 });
 
   const results: { name: string; email: string; status: "sent" | "skipped" | "error"; reason?: string; error?: string }[] = [];
 
@@ -262,11 +38,12 @@ export async function POST(req: NextRequest) {
     const completionIssues =
       type === "settings"
         ? await getSettingsIssues(lead.id, quarterId)
-        : type === "collection"
-        ? await getCollectionIssues(lead.id, quarterId)
-        : await getResultsIssues(lead.id, quarterId);
+        : await getCollectionIssues(lead.id, quarterId);
 
-    const isComplete = !completionIssues.hasNoObjectives && completionIssues.objectives.length === 0;
+    const isComplete =
+      !completionIssues.hasNoObjectives &&
+      completionIssues.summaryIssues.length === 0 &&
+      completionIssues.objectives.length === 0;
 
     if (isComplete) {
       results.push({ name: lead.name ?? "-", email: lead.email, status: "skipped", reason: "OKR sudah lengkap ✅" });
@@ -274,22 +51,10 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      await sendReminderEmail({
-        to: lead.email,
-        name: lead.name ?? lead.email,
-        type,
-        quarterName: quarter.name,
-        quarterId,
-        completionIssues,
-      });
+      await sendReminderEmail({ to: lead.email, name: lead.name ?? lead.email, type, quarterName: quarter.name, quarterId, completionIssues });
       results.push({ name: lead.name ?? "-", email: lead.email, status: "sent" });
     } catch (err) {
-      results.push({
-        name: lead.name ?? "-",
-        email: lead.email,
-        status: "error",
-        error: err instanceof Error ? err.message : "Unknown error",
-      });
+      results.push({ name: lead.name ?? "-", email: lead.email, status: "error", error: err instanceof Error ? err.message : "Unknown error" });
     }
   }
 
@@ -297,14 +62,10 @@ export async function POST(req: NextRequest) {
   const skippedCount = results.filter((r) => r.status === "skipped").length;
   const errCount = results.filter((r) => r.status === "error").length;
 
-  const messageParts = [];
-  if (sentCount > 0) messageParts.push(`${sentCount} email terkirim`);
-  if (skippedCount > 0) messageParts.push(`${skippedCount} sudah lengkap (tidak dikirim)`);
-  if (errCount > 0) messageParts.push(`${errCount} gagal`);
+  const parts = [];
+  if (sentCount > 0) parts.push(`${sentCount} email terkirim`);
+  if (skippedCount > 0) parts.push(`${skippedCount} sudah lengkap (tidak dikirim)`);
+  if (errCount > 0) parts.push(`${errCount} gagal`);
 
-  return NextResponse.json({
-    success: sentCount > 0 || skippedCount > 0,
-    message: messageParts.join(", ") + ".",
-    results,
-  });
+  return NextResponse.json({ success: sentCount > 0 || skippedCount > 0, message: parts.join(", ") + ".", results });
 }

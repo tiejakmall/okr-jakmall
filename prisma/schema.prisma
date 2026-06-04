@@ -32,17 +32,34 @@ model User {
 }
 
 model Quarter {
-  id         String      @id @default(cuid())
-  name       String
-  year       Int
-  quarter    Int
-  startDate  DateTime
-  endDate    DateTime
-  isActive   Boolean     @default(false)
-  objectives Objective[]
-  createdAt  DateTime    @default(now())
+  id              String             @id @default(cuid())
+  name            String
+  year            Int
+  quarter         Int
+  startDate       DateTime
+  endDate         DateTime
+  isActive        Boolean            @default(false)
+  objectives      Objective[]
+  reminderSchedules ReminderSchedule[]
+  createdAt       DateTime           @default(now())
 
   @@unique([year, quarter])
+}
+
+model ReminderSchedule {
+  id         String    @id @default(cuid())
+  type       String    // "settings" | "collection"
+  quarterId  String
+  quarter    Quarter   @relation(fields: [quarterId], references: [id], onDelete: Cascade)
+  frequency  String    // "weekly" | "biweekly" | "monthly"
+  dayOfWeek  Int?      // 0=Sun 1=Mon ... 6=Sat  (weekly/biweekly)
+  dayOfMonth Int?      // 1-28 (monthly)
+  hourWIB    Int       // 0-23 Jakarta time
+  isActive   Boolean   @default(true)
+  lastRun    DateTime?
+  nextRun    DateTime
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
 model Objective {
