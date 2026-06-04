@@ -145,7 +145,6 @@ async function getCollectionIssues(leadId: string, quarterId: string): Promise<C
           target: true,
           unit: true,
           teamProgress: true,
-          leadProgress: true,
           krAssignments: {
             select: {
               weight: true,
@@ -209,7 +208,6 @@ async function getCollectionIssues(leadId: string, quarterId: string): Promise<C
 
       // Hasil fields
       if (kr.teamProgress === 0) krIss.push("progress tim 0%");
-      if (kr.leadProgress === null || kr.leadProgress === 0) krIss.push("capaian lead belum diisi");
 
       // Per-member progress
       const emptyMembers = kr.krAssignments
