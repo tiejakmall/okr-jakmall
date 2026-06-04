@@ -143,10 +143,13 @@ export async function sendReminderEmail({
 </body>
 </html>`;
 
-  return resend.emails.send({
+  const { data, error } = await resend.emails.send({
     from: FROM_EMAIL,
     to,
     subject,
     html,
   });
+
+  if (error) throw new Error(error.message);
+  return data;
 }
