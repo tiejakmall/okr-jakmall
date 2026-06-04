@@ -178,8 +178,8 @@ function AssignmentSection({ a, index }: { a: AssignmentData; index: number }) {
                     <tbody>
                       {a.krAssignments.map((k) => (
                         <tr key={k.kraId} className="border-b border-slate-50 last:border-0">
-                          <td className="py-2.5 pr-3 font-medium text-slate-700 max-w-[180px]">
-                            <span className="truncate block">{k.krTitle}</span>
+                          <td className="py-2.5 pr-3 font-medium text-slate-700">
+                            <span className="break-words">{k.krTitle}</span>
                             {k.individualTarget != null && (
                               <span className="text-xs text-blue-500">⚡ target individu</span>
                             )}
