@@ -1,7 +1,90 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { sendReminderEmail, type ReminderType } from "@/lib/email";
+import { sendReminderEmail, type ReminderType, type CompletionIssues, type ObjectiveIssue } from "@/lib/email";
+
+async function getSettingsIssues(leadId: string, quarterId: string): Promise<CompletionIssues> {
+  const objectives = await prisma.objective.findMany({
+    where: { userId: leadId, quarterId },
+    select: {
+      id: true,
+      title: true,
+      status: true,
+      keyResults: {
+        select: { id: true, title: true, weight: true, target: true, unit: true },
+      },
+    },
+  });
+
+  if (objectives.length === 0) return { hasNoObjectives: true, objectives: [] };
+
+  const objectiveIssues: ObjectiveIssue[] = [];
+
+  for (const obj of objectives) {
+    const issues: string[] = [];
+    if (obj.status === "DRAFT") issues.push("Belum dikumpulkan (masih Draft)");
+
+    const totalWeight = obj.keyResults.reduce((s, kr) => s + kr.weight, 0);
+    if (obj.keyResults.length > 0 && Math.abs(totalWeight - 100) > 0.1) {
+      issues.push(`Total bobot KR: ${totalWeight}% (harus 100%)`);
+    }
+
+    const krIssues = obj.keyResults.flatMap((kr) => {
+      const krIss: string[] = [];
+      if (kr.weight === 0) krIss.push("bobot 0%");
+      if (kr.target === 0) krIss.push("target belum diisi");
+      if (!kr.unit || kr.unit.trim() === "") krIss.push("satuan belum dipilih");
+      return krIss.length > 0 ? [{ title: kr.title, issues: krIss }] : [];
+    });
+
+    if (issues.length > 0 || krIssues.length > 0) {
+      objectiveIssues.push({ title: obj.title, issues, krIssues });
+    }
+  }
+
+  return { hasNoObjectives: false, objectives: objectiveIssues };
+}
+
+async function getResultsIssues(leadId: string, quarterId: string): Promise<CompletionIssues> {
+  const objectives = await prisma.objective.findMany({
+    where: { userId: leadId, quarterId },
+    select: {
+      id: true,
+      title: true,
+      keyResults: {
+        select: {
+          id: true,
+          title: true,
+          krAssignments: {
+            select: {
+              progress: true,
+              assignment: { select: { member: { select: { name: true } } } },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (objectives.length === 0) return { hasNoObjectives: true, objectives: [] };
+
+  const objectiveIssues: ObjectiveIssue[] = [];
+
+  for (const obj of objectives) {
+    const krIssues = obj.keyResults.flatMap((kr) => {
+      const empty = kr.krAssignments.filter((a) => a.progress === 0);
+      if (empty.length === 0) return [];
+      const names = empty.map((a) => a.assignment.member.name).join(", ");
+      return [{ title: kr.title, issues: [`${empty.length} anggota belum isi progress: ${names}`] }];
+    });
+
+    if (krIssues.length > 0) {
+      objectiveIssues.push({ title: obj.title, issues: [], krIssues });
+    }
+  }
+
+  return { hasNoObjectives: false, objectives: objectiveIssues };
+}
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -30,13 +113,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Tidak ada Lead Divisi yang terdaftar." }, { status: 404 });
   }
 
-  const results: { name: string; email: string; status: "sent" | "error"; error?: string }[] = [];
+  const results: { name: string; email: string; status: "sent" | "skipped" | "error"; reason?: string; error?: string }[] = [];
 
   for (const lead of leads) {
     if (!lead.email) {
       results.push({ name: lead.name ?? "-", email: "-", status: "error", error: "Tidak ada email" });
       continue;
     }
+
+    const completionIssues =
+      type === "settings"
+        ? await getSettingsIssues(lead.id, quarterId)
+        : await getResultsIssues(lead.id, quarterId);
+
+    const isComplete = !completionIssues.hasNoObjectives && completionIssues.objectives.length === 0;
+
+    if (isComplete) {
+      results.push({ name: lead.name ?? "-", email: lead.email, status: "skipped", reason: "OKR sudah lengkap ✅" });
+      continue;
+    }
+
     try {
       await sendReminderEmail({
         to: lead.email,
@@ -44,6 +140,7 @@ export async function POST(req: NextRequest) {
         type,
         quarterName: quarter.name,
         quarterId,
+        completionIssues,
       });
       results.push({ name: lead.name ?? "-", email: lead.email, status: "sent" });
     } catch (err) {
@@ -57,11 +154,17 @@ export async function POST(req: NextRequest) {
   }
 
   const sentCount = results.filter((r) => r.status === "sent").length;
+  const skippedCount = results.filter((r) => r.status === "skipped").length;
   const errCount = results.filter((r) => r.status === "error").length;
 
+  const messageParts = [];
+  if (sentCount > 0) messageParts.push(`${sentCount} email terkirim`);
+  if (skippedCount > 0) messageParts.push(`${skippedCount} sudah lengkap (tidak dikirim)`);
+  if (errCount > 0) messageParts.push(`${errCount} gagal`);
+
   return NextResponse.json({
-    success: sentCount > 0,
-    message: `${sentCount} email terkirim${errCount > 0 ? `, ${errCount} gagal` : ""}.`,
+    success: sentCount > 0 || skippedCount > 0,
+    message: messageParts.join(", ") + ".",
     results,
   });
 }

@@ -7,45 +7,95 @@ const FROM_EMAIL = process.env.RESEND_FROM ?? "OKR Tracker <onboarding@resend.de
 
 export type ReminderType = "settings" | "results";
 
+export type KRIssue = { title: string; issues: string[] };
+export type ObjectiveIssue = { title: string; issues: string[]; krIssues: KRIssue[] };
+export type CompletionIssues = {
+  hasNoObjectives: boolean;
+  objectives: ObjectiveIssue[];
+};
+
+function buildIssuesHtml(issues: CompletionIssues): string {
+  if (issues.hasNoObjectives) {
+    return `
+      <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:16px 20px;margin:20px 0;">
+        <p style="margin:0;font-size:14px;font-weight:bold;color:#dc2626;">⚠️ Belum ada Objective yang dibuat</p>
+        <p style="margin:6px 0 0;font-size:13px;color:#ef4444;">Silakan buat minimal satu Objective beserta Key Results-nya.</p>
+      </div>`;
+  }
+
+  if (issues.objectives.length === 0) return "";
+
+  const rows = issues.objectives.map((obj) => {
+    const objIssueRows = obj.issues.map(
+      (iss) => `<li style="color:#b45309;font-size:13px;margin:3px 0;">${iss}</li>`
+    ).join("");
+
+    const krRows = obj.krIssues.map((kr) => {
+      const krIssueItems = kr.issues.map(
+        (iss) => `<span style="display:inline-block;background:#fef3c7;color:#92400e;border-radius:4px;padding:1px 7px;font-size:12px;margin:2px 3px 2px 0;">${iss}</span>`
+      ).join("");
+      return `
+        <tr>
+          <td style="padding:5px 0 5px 16px;vertical-align:top;">
+            <span style="font-size:13px;color:#374151;">📌 ${kr.title}</span><br>
+            <span style="display:inline-block;margin-top:3px;">${krIssueItems}</span>
+          </td>
+        </tr>`;
+    }).join("");
+
+    return `
+      <tr>
+        <td style="padding:8px 0;">
+          <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:10px 14px;">
+            <p style="margin:0 0 4px;font-size:13px;font-weight:bold;color:#1c1917;">🎯 ${obj.title}</p>
+            ${obj.issues.length > 0 ? `<ul style="margin:4px 0 6px 16px;padding:0;">${objIssueRows}</ul>` : ""}
+            ${obj.krIssues.length > 0 ? `<table width="100%" cellpadding="0" cellspacing="0">${krRows}</table>` : ""}
+          </div>
+        </td>
+      </tr>`;
+  }).join("");
+
+  return `
+    <div style="margin:20px 0;">
+      <p style="margin:0 0 10px;font-size:14px;font-weight:bold;color:#dc2626;">⚠️ Bagian yang perlu dilengkapi:</p>
+      <table width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+    </div>`;
+}
+
 export async function sendReminderEmail({
   to,
   name,
   type,
   quarterName,
   quarterId,
+  completionIssues,
 }: {
   to: string;
   name: string;
   type: ReminderType;
   quarterName: string;
   quarterId: string;
+  completionIssues: CompletionIssues;
 }) {
   const isSettings = type === "settings";
   const subject = isSettings
-    ? `[Reminder] Mohon isi OKR Divisi – ${quarterName}`
+    ? `[Reminder] Mohon lengkapi OKR Divisi – ${quarterName}`
     : `[Reminder] Mohon update progress OKR – ${quarterName}`;
 
-  const actionLabel = isSettings ? "Isi OKR Sekarang" : "Update Progress Sekarang";
+  const actionLabel = isSettings ? "Buka Halaman OKR" : "Update Progress Sekarang";
   const link = isSettings
     ? `${APP_URL}/okr?quarterId=${quarterId}`
     : `${APP_URL}/distribusi?quarterId=${quarterId}`;
 
-  const bodyText = isSettings
-    ? `Halo ${name},<br><br>
-       Kamu mendapat reminder untuk segera mengisi <strong>Objective & Key Results (OKR)</strong> divisi kamu
-       untuk quarter <strong>${quarterName}</strong>.<br><br>
-       Langkah:<br>
-       1. Login ke OKR Tracker<br>
-       2. Buka menu <strong>OKR Divisi</strong><br>
-       3. Buat Objective dan Key Results untuk ${quarterName}<br>
-       4. Klik <strong>Kumpulkan OKR</strong> jika sudah selesai`
-    : `Halo ${name},<br><br>
-       Kamu mendapat reminder untuk segera mengupdate <strong>progress/hasil OKR</strong> divisi kamu
-       untuk quarter <strong>${quarterName}</strong>.<br><br>
-       Langkah:<br>
-       1. Login ke OKR Tracker<br>
-       2. Buka menu <strong>Distribusi Anggota</strong><br>
-       3. Update progress tiap Key Result untuk masing-masing anggota`;
+  const introParagraph = isSettings
+    ? `Halo <strong>${name}</strong>,<br><br>
+       Berikut adalah ringkasan <strong>OKR Divisi</strong> kamu untuk quarter <strong>${quarterName}</strong>
+       yang masih perlu dilengkapi sebelum batas waktu pengumpulan.`
+    : `Halo <strong>${name}</strong>,<br><br>
+       Berikut adalah ringkasan <strong>progress/hasil OKR</strong> divisi kamu
+       untuk quarter <strong>${quarterName}</strong> yang masih perlu diupdate.`;
+
+  const issuesHtml = buildIssuesHtml(completionIssues);
 
   const html = `
 <!DOCTYPE html>
@@ -68,9 +118,10 @@ export async function sendReminderEmail({
             <p style="margin:0 0 16px;font-size:22px;font-weight:bold;color:#0f172a;">
               ${isSettings ? "⏰ Reminder Pengisian OKR" : "📊 Reminder Update Progress OKR"}
             </p>
-            <p style="margin:0 0 20px;color:#475569;font-size:14px;line-height:1.6;">
-              ${bodyText}
+            <p style="margin:0 0 8px;color:#475569;font-size:14px;line-height:1.6;">
+              ${introParagraph}
             </p>
+            ${issuesHtml}
             <a href="${link}"
                style="display:inline-block;background:#fbbf24;color:#1c1917;font-weight:bold;font-size:14px;
                       padding:12px 24px;border-radius:10px;text-decoration:none;margin-top:8px;">

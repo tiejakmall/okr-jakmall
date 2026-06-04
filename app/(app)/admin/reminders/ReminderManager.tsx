@@ -11,7 +11,7 @@ type Lead = {
   hasOKR: boolean;
   hasProgress: boolean;
 };
-type SendResult = { name: string; email: string; status: "sent" | "error"; error?: string };
+type SendResult = { name: string; email: string; status: "sent" | "skipped" | "error"; reason?: string; error?: string };
 
 const btnAmber =
   "flex items-center gap-2 bg-amber-400 text-gray-900 font-bold text-sm px-5 py-2.5 rounded-xl " +
@@ -131,11 +131,12 @@ export default function ReminderManager({
             <div className="space-y-1">
               {result.results.map((r, i) => (
                 <div key={i} className="flex items-center gap-2 text-xs">
-                  <span className={r.status === "sent" ? "text-green-600" : "text-red-500"}>
-                    {r.status === "sent" ? "✓" : "✗"}
+                  <span className={r.status === "sent" ? "text-green-600" : r.status === "skipped" ? "text-slate-400" : "text-red-500"}>
+                    {r.status === "sent" ? "✓" : r.status === "skipped" ? "—" : "✗"}
                   </span>
                   <span className="font-medium text-slate-700">{r.name}</span>
                   <span className="text-slate-400">{r.email}</span>
+                  {r.status === "skipped" && <span className="text-slate-400">{r.reason}</span>}
                   {r.error && <span className="text-red-500">— {r.error}</span>}
                 </div>
               ))}
