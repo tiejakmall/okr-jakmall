@@ -1,6 +1,5 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { aggregateKRProgress } from "@/lib/calculations";
 import OKRManager from "./OKRManager";
 import ImportExportSection from "./ImportExportSection";
 import QuarterSelector from "./QuarterSelector";
@@ -60,10 +59,24 @@ export default async function OKRPage({ searchParams }: { searchParams: Promise<
         select: { keyResultId: true, weight: true, progress: true, target: true },
       })
     : [];
-  const enrichedObjectives = aggregateKRProgress(
-    JSON.parse(JSON.stringify(objectives)),
-    allKRAssignments
-  );
+  const krProgressMap = new Map<string, number[]>();
+  for (const kra of allKRAssignments) {
+    const list = krProgressMap.get(kra.keyResultId) ?? [];
+    list.push(kra.progress);
+    krProgressMap.set(kra.keyResultId, list);
+  }
+  const enrichedObjectives = objectives.map((obj) => ({
+    ...obj,
+    keyResults: obj.keyResults.map((kr) => {
+      const list = krProgressMap.get(kr.id);
+      if (!list || list.length === 0) return kr;
+      const teamProgress =
+        kr.unit === "%"
+          ? list.reduce((s, v) => s + v, 0) / list.length
+          : list.reduce((s, v) => s + v, 0);
+      return { ...kr, teamProgress };
+    }),
+  }));
 
   const objCount = objectives.length;
   const submittedCount = objectives.filter((o) => o.status === "SUBMITTED").length;
