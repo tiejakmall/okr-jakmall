@@ -104,7 +104,7 @@ export default async function OKRPage({ searchParams }: { searchParams: Promise<
         defaultOpen={true}
       >
         <OKRManager
-          initialObjectives={enrichedObjectives}
+          initialObjectives={JSON.parse(JSON.stringify(enrichedObjectives))}
           quarterId={selectedQuarter.id}
           userId={session!.user.id}
           allQuarters={JSON.parse(JSON.stringify(quarters))}
