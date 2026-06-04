@@ -982,6 +982,7 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showCopyModal, setShowCopyModal] = useState(false);
+  const [showTools, setShowTools] = useState(false);
   const [employees, setEmployees] = useState<{ id: string; name: string; position: string | null }[]>([]);
   const comboRef = useRef<HTMLDivElement>(null);
 
@@ -1134,7 +1135,7 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {showCopyModal && (
         <CopyFromQuarterModal
           allQuarters={allQuarters}
@@ -1145,30 +1146,10 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
         />
       )}
 
-      {/* Distribusi Excel import/export */}
-      <DistribusiExcel leadId={leadId} objectives={objectives} quarterId={quarterId} />
-
-      {/* Copy from quarter */}
-      {allQuarters.length > 1 && (
-        <button
-          onClick={() => setShowCopyModal(true)}
-          className="w-full flex items-center justify-center gap-2 bg-white border border-slate-200 text-slate-600 font-semibold text-sm px-4 py-3 rounded-2xl
-            shadow-[0_4px_0_#e2e8f0] hover:shadow-[0_2px_0_#e2e8f0] hover:translate-y-0.5
-            active:shadow-[0_1px_0_#e2e8f0] active:translate-y-[3px] transition-all duration-75"
-        >
-          📋 Salin Distribusi dari Quarter Lain
-        </button>
-      )}
-
-      {/* Progress Excel import */}
-      <ProgressExcel leadId={leadId} quarterId={quarterId} />
-
-      {/* Add member */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4">
-        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">➕ Tambah Anggota</p>
-
+      {/* ── 1. Tambah Anggota ─────────────────────────────────────────── */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">➕ Tambah Anggota</p>
         <div className="flex gap-2">
-          {/* Combobox */}
           <div className="relative flex-1" ref={comboRef}>
             <input
               className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white transition"
@@ -1210,7 +1191,6 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
               ) : null;
             })()}
           </div>
-
           <button
             onClick={() => { setShowSuggestions(false); addMember(); }}
             disabled={saving || !newName.trim()}
@@ -1222,37 +1202,70 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
             ➕ Tambah
           </button>
         </div>
-
-        {employees.length === 0 && (
-          <p className="text-xs text-slate-400 mt-2">💡 Daftar karyawan kosong. Admin bisa menambahkan di Admin → Karyawan.</p>
-        )}
+        <div className="flex items-center gap-4 flex-wrap">
+          {employees.length === 0 && (
+            <p className="text-xs text-slate-400">💡 Daftar karyawan kosong — Admin bisa tambahkan di Admin → Karyawan.</p>
+          )}
+          {allQuarters.length > 1 && (
+            <button
+              onClick={() => setShowCopyModal(true)}
+              className="text-xs text-slate-500 hover:text-amber-600 font-semibold flex items-center gap-1 transition-colors"
+            >
+              📋 Salin dari quarter lain
+            </button>
+          )}
+        </div>
       </div>
 
-      {members.length === 0 && (
+      {/* ── 2. Kartu anggota ──────────────────────────────────────────── */}
+      {members.length === 0 ? (
         <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center">
           <div className="text-4xl mb-3">👥</div>
           <p className="text-slate-600 text-sm font-medium">Belum ada anggota</p>
-          <p className="text-slate-400 text-xs mt-1">Tambah nama anggota di atas atau import dari Excel.</p>
+          <p className="text-slate-400 text-xs mt-1">Tambah nama di atas, atau salin distribusi dari quarter lain.</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {members.map((m) => (
+            <MemberCard
+              key={m.id}
+              member={m}
+              objectives={objectives}
+              onDelete={deleteMember}
+              onAddAssignment={addAssignment}
+              onRemoveAssignment={removeAssignment}
+              onWeightChange={updateWeight}
+              onAddKR={addKR}
+              onRemoveKR={removeKR}
+              onKRWeightChange={updateKRWeight}
+              onKRProgressChange={updateKRProgress}
+              onKRTargetChange={updateKRTarget}
+            />
+          ))}
         </div>
       )}
 
-      <div className="space-y-4">
-        {members.map((m) => (
-          <MemberCard
-            key={m.id}
-            member={m}
-            objectives={objectives}
-            onDelete={deleteMember}
-            onAddAssignment={addAssignment}
-            onRemoveAssignment={removeAssignment}
-            onWeightChange={updateWeight}
-            onAddKR={addKR}
-            onRemoveKR={removeKR}
-            onKRWeightChange={updateKRWeight}
-            onKRProgressChange={updateKRProgress}
-            onKRTargetChange={updateKRTarget}
-          />
-        ))}
+      {/* ── 3. Alat Bantu Excel ───────────────────────────────────────── */}
+      <div className="border border-slate-200 rounded-2xl overflow-hidden">
+        <button
+          onClick={() => setShowTools((v) => !v)}
+          className="w-full flex items-center justify-between px-4 py-3 bg-slate-50 hover:bg-slate-100 transition text-left"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-sm">🔧</span>
+            <span className="text-sm font-semibold text-slate-600">Alat Bantu Excel</span>
+            <span className="text-xs text-slate-400">— import/export distribusi & update progress</span>
+          </div>
+          <span className="text-slate-400 text-xs">{showTools ? "▲" : "▼"}</span>
+        </button>
+        {showTools && (
+          <div className="p-4 space-y-4 bg-white border-t border-slate-100">
+            <DistribusiExcel leadId={leadId} objectives={objectives} quarterId={quarterId} />
+            <div className="border-t border-slate-100 pt-4">
+              <ProgressExcel leadId={leadId} quarterId={quarterId} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

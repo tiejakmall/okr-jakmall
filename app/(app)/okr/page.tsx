@@ -87,7 +87,7 @@ export default async function OKRPage({ searchParams }: { searchParams: Promise<
         isLead={isLead}
       />
 
-      {/* Bagian 1: OKR */}
+      {/* Bagian 1: OKR + Import/Export (satu section) */}
       <CollapsibleSection
         title={isLead ? "OKR Divisi" : "OKR Saya"}
         subtitle={selectedQuarter.name}
@@ -107,22 +107,22 @@ export default async function OKRPage({ searchParams }: { searchParams: Promise<
           allQuarters={JSON.parse(JSON.stringify(quarters))}
           isLead={isLead}
         />
-      </CollapsibleSection>
-
-      {/* Import / Export OKR Divisi */}
-      <CollapsibleSection
-        title="Import / Export OKR Divisi"
-        subtitle="Import atau ekspor data OKR Divisi (objective & key result) — gunakan template Excel yang tersedia"
-        defaultOpen={false}
-      >
-        <ImportExportSection quarterId={selectedQuarter.id} />
+        {/* Import/Export OKR — sub-panel di bawah OKR manager */}
+        <div className="mt-6 pt-5 border-t border-slate-100">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">📁 Import / Export OKR</span>
+            <span className="text-xs text-slate-300">—</span>
+            <span className="text-xs text-slate-400">download template → isi → upload, atau ekspor ke Excel</span>
+          </div>
+          <ImportExportSection quarterId={selectedQuarter.id} />
+        </div>
       </CollapsibleSection>
 
       {/* Bagian 2: Distribusi ke anggota */}
       {isLead && (
         <CollapsibleSection
-          title="Distribusi OKR Individu ke Anggota"
-          subtitle="Assign anggota ke objective + key result divisi, lalu isi bobot & target individu. Bobot objective harus 100%, bobot KR per objective harus 100%."
+          title="Distribusi ke Anggota"
+          subtitle={`Assign objective & KR ke anggota, atur bobot dan target individu · ${selectedQuarter.name}`}
           badge={
             teamMembers.length > 0 ? (
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500">
