@@ -23,6 +23,7 @@ const adminOnlyNav = [
   { href: "/admin/quarters", label: "Quarter", emoji: "⏱️" },
   { href: "/admin/users", label: "Pengguna", emoji: "👥" },
   { href: "/admin/employees", label: "Karyawan", emoji: "🧑‍💼" },
+  { href: "/admin/reminders", label: "Reminder", emoji: "🔔" },
 ];
 
 export default function Sidebar({
