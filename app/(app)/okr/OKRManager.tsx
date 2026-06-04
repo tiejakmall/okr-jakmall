@@ -94,7 +94,7 @@ function WeightBar({ objectives }: { objectives: Objective[] }) {
             {objectives.map((obj, i) => (
               <div key={obj.id} className="flex items-center gap-1.5 text-xs">
                 <div className={`w-2.5 h-2.5 rounded-sm ${colors[i % colors.length]}`} />
-                <span className="text-slate-600 truncate max-w-[8rem]">{obj.title}</span>
+                <span className="text-slate-600 break-words">{obj.title}</span>
                 <span className="font-bold text-slate-700">{obj.weight}%</span>
               </div>
             ))}
@@ -266,7 +266,7 @@ function ImportModal({
                               {objSel ? <CheckSquare size={16} className="text-amber-500" /> : <Square size={16} className="text-slate-300" />}
                             </button>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-semibold text-slate-700 truncate">{obj.title}</p>
+                              <p className="text-sm font-semibold text-slate-700 break-words">{obj.title}</p>
                               <p className="text-xs text-slate-400 mt-0.5">
                                 bobot {obj.weight}% · <span className={krCount > 0 ? "text-amber-600 font-medium" : ""}>{krCount}/{obj.keyResults.length} KR</span>
                               </p>
@@ -288,7 +288,7 @@ function ImportModal({
                                   <button key={kr.id} onClick={() => toggleKR(obj.id, kr.id)}
                                     className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-left transition-colors ${krSel ? "bg-amber-100 border border-amber-200" : "bg-white border border-slate-100 hover:bg-slate-50"}`}>
                                     {krSel ? <CheckSquare size={13} className="text-amber-500 flex-shrink-0" /> : <Square size={13} className="text-slate-300 flex-shrink-0" />}
-                                    <span className="text-xs text-slate-700 truncate flex-1">{kr.title}</span>
+                                    <span className="text-xs text-slate-700 break-words flex-1">{kr.title}</span>
                                     <span className="text-xs text-slate-400 flex-shrink-0">{kr.target} {kr.unit}</span>
                                   </button>
                                 );
@@ -610,7 +610,7 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
               }`}
             >
               {/* Objective header */}
-              <div className="flex items-center gap-3 px-4 py-3.5">
+              <div className="flex items-start gap-3 px-4 py-3.5">
                 {/* Checkbox in select mode (only for DRAFT) */}
                 {selectMode && isDraft && (
                   <button
@@ -626,24 +626,26 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
 
                 <button
                   onClick={() => setExpanded((p) => ({ ...p, [obj.id]: !p[obj.id] }))}
-                  className="text-slate-400 hover:text-slate-600 transition flex-shrink-0"
+                  className="text-slate-400 hover:text-slate-600 transition flex-shrink-0 mt-0.5"
                 >
                   {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                 </button>
 
-                <span className="w-6 h-6 rounded-full bg-amber-400 text-gray-900 text-xs font-bold flex items-center justify-center flex-shrink-0 shadow-[0_2px_0_#d97706]">
+                <span className="w-6 h-6 rounded-full bg-amber-400 text-gray-900 text-xs font-bold flex items-center justify-center flex-shrink-0 shadow-[0_2px_0_#d97706] mt-0.5">
                   {objIdx + 1}
                 </span>
 
-                <input
-                  className="flex-1 font-semibold text-slate-800 text-sm border-b border-transparent hover:border-slate-200 focus:border-amber-400 focus:outline-none bg-transparent py-0.5 disabled:cursor-default disabled:text-slate-600"
+                <textarea
+                  className="flex-1 font-semibold text-slate-800 text-sm border-b border-transparent hover:border-slate-200 focus:border-amber-400 focus:outline-none bg-transparent py-0.5 disabled:cursor-default disabled:text-slate-600 resize-none overflow-hidden leading-snug"
+                  rows={1}
                   value={obj.title}
                   disabled={isLocked}
-                  onChange={(e) => updateObjective(obj.id, { title: e.target.value })}
+                  ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
+                  onChange={(e) => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; updateObjective(obj.id, { title: e.target.value }); }}
                   onBlur={() => !isLocked && saveObjective(obj)}
                 />
 
-                <div className="flex items-center gap-1.5 flex-shrink-0">
+                <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
                   <span className="text-xs text-slate-400">Bobot</span>
                   <input
                     type="number"
@@ -657,7 +659,7 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
                   <span className="text-xs text-slate-400">%</span>
                 </div>
 
-                <span className={`text-xs font-bold px-2.5 py-1 rounded-lg flex-shrink-0 ${
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-lg flex-shrink-0 mt-0.5 ${
                   achievement >= 100 ? "bg-green-100 text-green-700"
                   : achievement >= 70 ? "bg-amber-100 text-amber-700"
                   : "bg-red-100 text-red-600"
@@ -668,14 +670,14 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
                 {isLocked ? (
                   <button
                     onClick={() => recallOKR(obj.id)}
-                    className="text-slate-400 hover:text-orange-500 transition flex-shrink-0 text-base"
+                    className="text-slate-400 hover:text-orange-500 transition flex-shrink-0 text-base mt-0.5"
                     title="Tarik kembali ke draft"
                   >
                     🔄
                   </button>
                 ) : (
                   !selectMode && (
-                    <button onClick={() => deleteObjective(obj.id)} className={`${btnDanger} flex-shrink-0`}>
+                    <button onClick={() => deleteObjective(obj.id)} className={`${btnDanger} flex-shrink-0 mt-0.5`}>
                       <Trash2 size={15} />
                     </button>
                   )
@@ -735,11 +737,13 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
                             <span className="text-xs font-bold text-slate-400 bg-slate-100 rounded-md px-1.5 py-0.5 flex-shrink-0 min-w-[2rem] text-center">
                               {objIdx + 1}.{krIdx + 1}
                             </span>
-                            <input
-                              className="flex-1 text-sm font-medium text-slate-800 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-amber-400 focus:outline-none disabled:cursor-default"
+                            <textarea
+                              className="flex-1 text-sm font-medium text-slate-800 bg-transparent border-b border-transparent hover:border-slate-200 focus:border-amber-400 focus:outline-none disabled:cursor-default resize-none overflow-hidden leading-snug"
+                              rows={1}
                               value={kr.title}
                               disabled={isLocked}
-                              onChange={(e) => updateKR(obj.id, kr.id, { title: e.target.value })}
+                              ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
+                              onChange={(e) => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; updateKR(obj.id, kr.id, { title: e.target.value }); }}
                               onBlur={() => !isLocked && saveKR(kr)}
                               placeholder="Judul Key Result"
                             />

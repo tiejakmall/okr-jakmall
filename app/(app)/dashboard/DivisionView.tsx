@@ -126,8 +126,8 @@ function ObjectiveSection({ obj, index }: { obj: ObjData; index: number }) {
                   const progress = kr.teamProgress + (kr.leadProgress ?? 0);
                   return (
                     <tr key={kr.id} className="border-b border-slate-50 last:border-0">
-                      <td className="py-2.5 pr-3 font-medium text-slate-700 max-w-[180px]">
-                        <span className="truncate block">{kr.title}</span>
+                      <td className="py-2.5 pr-3 font-medium text-slate-700">
+                        <span className="break-words">{kr.title}</span>
                         {kr.leadProgress != null && kr.leadProgress > 0 && (
                           <span className="text-xs text-blue-500">➕ lead: {kr.leadProgress}</span>
                         )}
@@ -136,7 +136,7 @@ function ObjectiveSection({ obj, index }: { obj: ObjData; index: number }) {
                       <td className="py-2.5 px-2 text-right text-slate-400">{kr.unit}</td>
                       <td className="py-2.5 px-2 text-right font-semibold text-slate-600">{kr.weight}%</td>
                       <td className="py-2.5 px-2 text-right tabular-nums text-slate-700">
-                        {progress} / {kr.target}
+                        {Number.isInteger(progress) ? progress : progress.toFixed(2)} / {kr.target}
                       </td>
                       <td className="py-2.5 pl-2 text-right">
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-lg ${achClass(kr.achievement)}`}>
@@ -171,8 +171,8 @@ function ObjectiveSection({ obj, index }: { obj: ObjData; index: number }) {
                     <tr className="border-b border-slate-100">
                       <th className="text-left py-2 pr-3 text-xs font-semibold text-slate-400">Anggota</th>
                       {obj.keyResults.filter((kr) => kr.memberContributions.length > 0).map((kr) => (
-                        <th key={kr.id} className="text-right py-2 px-2 text-xs font-semibold text-slate-400 max-w-[90px]">
-                          <span className="truncate block">{kr.title.length > 12 ? kr.title.slice(0, 12) + "…" : kr.title}</span>
+                        <th key={kr.id} className="text-right py-2 px-2 text-xs font-semibold text-slate-400 min-w-[80px]">
+                          <span className="break-words">{kr.title}</span>
                         </th>
                       ))}
                     </tr>
