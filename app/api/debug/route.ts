@@ -18,6 +18,10 @@ export async function GET() {
         where: { role: "MEMBER" },
         select: { id: true, name: true, teamMembership: { select: { id: true, name: true } } },
       });
+      const allTeamMembers = await prisma.teamMember.findMany({
+        select: { id: true, name: true, userId: true, lead: { select: { name: true, division: true } } },
+        orderBy: { name: "asc" },
+      });
       const activeQuarter = await prisma.quarter.findFirst({ where: { isActive: true }, select: { id: true, name: true } });
       const assignmentCount = teamMember && activeQuarter
         ? await prisma.objectiveAssignment.count({ where: { memberId: teamMember.id, objective: { quarterId: activeQuarter.id } } })
@@ -30,6 +34,7 @@ export async function GET() {
         activeQuarter,
         assignmentsInActiveQuarter: assignmentCount,
         allMemberLinks: allMembers.map(u => ({ userId: u.id, name: u.name, linked: u.teamMembership?.name ?? null })),
+        allTeamMembers,
       };
     }
 
