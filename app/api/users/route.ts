@@ -34,5 +34,12 @@ export async function POST(req: NextRequest) {
     },
     select: { id: true, name: true, email: true, role: true, division: true, createdAt: true },
   });
+
+  if (body.teamMemberId) {
+    const existing = await prisma.teamMember.findUnique({ where: { userId: user.id } });
+    if (existing) await prisma.teamMember.update({ where: { id: existing.id }, data: { userId: null } });
+    await prisma.teamMember.update({ where: { id: body.teamMemberId }, data: { userId: user.id } });
+  }
+
   return NextResponse.json(user, { status: 201 });
 }
