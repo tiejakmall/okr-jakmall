@@ -28,7 +28,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Handle TeamMember link
   if (body.teamMemberId !== undefined) {
     // Clear any existing link for this user
-    await prisma.teamMember.updateMany({ where: { userId: id }, data: { userId: null } });
+    const existingLink = await prisma.teamMember.findUnique({ where: { userId: id } });
+    if (existingLink) {
+      await prisma.teamMember.update({ where: { id: existingLink.id }, data: { userId: null } });
+    }
     // Set new link if provided
     if (body.teamMemberId) {
       await prisma.teamMember.update({ where: { id: body.teamMemberId }, data: { userId: id } });

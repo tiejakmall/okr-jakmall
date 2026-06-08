@@ -1,6 +1,21 @@
 import { prisma } from "@/lib/prisma";
 import { auth } from "@/auth";
 
+// Temporary: POST to force-set a teamMember link
+export async function POST(req: Request) {
+  try {
+    const session = await (await import("@/auth")).auth();
+    if (session?.user.role !== "ADMIN") return Response.json({ error: "Forbidden" }, { status: 403 });
+    const { userId, teamMemberId } = await req.json();
+    const existing = await prisma.teamMember.findUnique({ where: { userId } });
+    if (existing) await prisma.teamMember.update({ where: { id: existing.id }, data: { userId: null } });
+    const result = await prisma.teamMember.update({ where: { id: teamMemberId }, data: { userId } });
+    return Response.json({ ok: true, linked: result.name });
+  } catch (e) {
+    return Response.json({ ok: false, error: String(e) }, { status: 500 });
+  }
+}
+
 export async function GET() {
   try {
     const session = await auth();
