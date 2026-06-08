@@ -117,17 +117,37 @@ export async function POST(req: Request) {
     const role = VALID_ROLES.includes(roleRaw) ? roleRaw : "MEMBER";
 
     try {
+      let userId: string;
       const existing = await prisma.user.findUnique({ where: { email } });
       if (existing) {
         const data: Record<string, unknown> = { name, role, division };
         if (password) data.password = await bcrypt.hash(password, 10);
         await prisma.user.update({ where: { email }, data });
+        userId = existing.id;
         updated++;
       } else {
         if (!password) { errors.push(`Baris ${rowNum} "${name}": Password wajib untuk pengguna baru.`); continue; }
         const hashed = await bcrypt.hash(password, 10);
-        await prisma.user.create({ data: { name, email, password: hashed, role: role as "ADMIN" | "LEAD" | "MEMBER", division } });
+        const created_user = await prisma.user.create({ data: { name, email, password: hashed, role: role as "ADMIN" | "LEAD" | "MEMBER", division } });
+        userId = created_user.id;
         created++;
+      }
+
+      // Auto-link MEMBER to matching TeamMember (same name + same division)
+      if (role === "MEMBER" && division) {
+        const alreadyLinked = await prisma.teamMember.findUnique({ where: { userId } });
+        if (!alreadyLinked) {
+          const match = await prisma.teamMember.findFirst({
+            where: {
+              name: { equals: name, mode: "insensitive" },
+              userId: null,
+              lead: { division },
+            },
+          });
+          if (match) {
+            await prisma.teamMember.update({ where: { id: match.id }, data: { userId } });
+          }
+        }
       }
     } catch (e) {
       errors.push(`Baris ${rowNum} "${name}": ${String(e)}`);
