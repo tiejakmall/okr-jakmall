@@ -140,17 +140,32 @@ export async function POST(req: Request) {
         created++;
       }
 
-      // Auto-link MEMBER to matching TeamMember (same name + same division)
+      // Auto-link MEMBER to matching TeamMember (same division, name match)
       if (role === "MEMBER" && division) {
         const alreadyLinked = await prisma.teamMember.findUnique({ where: { userId } });
         if (!alreadyLinked) {
-          const match = await prisma.teamMember.findFirst({
-            where: {
-              name: { equals: name, mode: "insensitive" },
-              userId: null,
-              lead: { division },
-            },
+          // 1. Try exact match first
+          let match = await prisma.teamMember.findFirst({
+            where: { name: { equals: name, mode: "insensitive" }, userId: null, lead: { division } },
           });
+          // 2. Fallback: TeamMember name starts with import name (e.g. "Tievanto" → "Tievanto Yasser Alfatah")
+          if (!match) {
+            const candidates = await prisma.teamMember.findMany({
+              where: { name: { startsWith: name, mode: "insensitive" }, userId: null, lead: { division } },
+            });
+            if (candidates.length === 1) match = candidates[0];
+          }
+          // 3. Fallback: import name starts with TeamMember name (e.g. "Tievanto Yasser" → "Tievanto")
+          if (!match) {
+            const candidates = await prisma.teamMember.findMany({
+              where: { userId: null, lead: { division } },
+            });
+            const found = candidates.filter(tm =>
+              name.toLowerCase().startsWith(tm.name.toLowerCase()) ||
+              tm.name.toLowerCase().startsWith(name.toLowerCase())
+            );
+            if (found.length === 1) match = found[0];
+          }
           if (match) {
             await prisma.teamMember.update({ where: { id: match.id }, data: { userId } });
           }
