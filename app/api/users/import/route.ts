@@ -103,6 +103,7 @@ export async function POST(req: Request) {
 
   let created = 0, updated = 0;
   const errors: string[] = [];
+  const linkLog: string[] = [];
 
   for (let rowNum = 2; rowNum <= sheet.rowCount; rowNum++) {
     const row = sheet.getRow(rowNum);
@@ -143,27 +144,28 @@ export async function POST(req: Request) {
       // Auto-link MEMBER to matching TeamMember (same division, name match)
       if (role === "MEMBER" && division) {
         const alreadyLinked = await prisma.teamMember.findUnique({ where: { userId } });
-        if (!alreadyLinked) {
-          // Fetch all unlinked TeamMembers and filter in JS to avoid Prisma relational filter issues
+        if (alreadyLinked) {
+          linkLog.push(`${name}: sudah ter-link ke "${alreadyLinked.name}"`);
+        } else {
           const pool = await prisma.teamMember.findMany({
-            where: { userId: null },
             include: { lead: { select: { division: true } } },
           });
-          const inDivision = pool.filter(
-            (tm) => tm.lead.division?.toLowerCase() === division.toLowerCase()
+          const unlinkedInDiv = pool.filter(
+            (tm) => tm.userId === null && tm.lead.division?.toLowerCase() === division.toLowerCase()
           );
+          linkLog.push(`${name}: pool=${pool.length}, inDiv=${unlinkedInDiv.length} [${unlinkedInDiv.map(t => t.name).join(", ")}]`);
 
           const nameLower = name.toLowerCase();
-          let match =
-            // 1. Exact match
-            inDivision.find((tm) => tm.name.toLowerCase() === nameLower) ??
-            // 2. TeamMember name starts with import name ("Tievanto" → "Tievanto Yasser Alfatah")
-            (() => { const c = inDivision.filter((tm) => tm.name.toLowerCase().startsWith(nameLower)); return c.length === 1 ? c[0] : undefined; })() ??
-            // 3. Import name starts with TeamMember name ("Tievanto Yasser" → "Tievanto")
-            (() => { const c = inDivision.filter((tm) => nameLower.startsWith(tm.name.toLowerCase())); return c.length === 1 ? c[0] : undefined; })();
+          const match =
+            unlinkedInDiv.find((tm) => tm.name.toLowerCase() === nameLower) ??
+            (() => { const c = unlinkedInDiv.filter((tm) => tm.name.toLowerCase().startsWith(nameLower)); return c.length === 1 ? c[0] : undefined; })() ??
+            (() => { const c = unlinkedInDiv.filter((tm) => nameLower.startsWith(tm.name.toLowerCase())); return c.length === 1 ? c[0] : undefined; })();
 
           if (match) {
             await prisma.teamMember.update({ where: { id: match.id }, data: { userId } });
+            linkLog.push(`${name}: ✅ linked ke "${match.name}"`);
+          } else {
+            linkLog.push(`${name}: ❌ no match found`);
           }
         }
       }
@@ -178,5 +180,6 @@ export async function POST(req: Request) {
     created,
     updated,
     errors: errors.length > 0 ? errors : undefined,
+    linkLog,
   });
 }
