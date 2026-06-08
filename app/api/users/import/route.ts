@@ -14,6 +14,9 @@ function readStr(cell: ExcelJS.Cell): string {
     const r = (v as ExcelJS.CellFormulaValue).result;
     return r == null ? "" : String(r);
   }
+  // Hyperlink cell: { text: "...", hyperlink: "mailto:..." }
+  if (typeof v === "object" && "text" in v)
+    return String((v as { text: unknown }).text);
   return String(v);
 }
 
