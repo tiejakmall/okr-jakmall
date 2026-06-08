@@ -143,9 +143,39 @@ export default function UserManager({ initialUsers, teamMembers }: { initialUser
   const [form, setForm] = useState<FormState>(emptyForm);
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<{ type: "success" | "error"; message: string; errors?: string[] } | null>(null);
+  const [linkingUserId, setLinkingUserId] = useState<string | null>(null);
+  const [linkSelectValue, setLinkSelectValue] = useState("");
+  const [linkSaving, setLinkSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function cancel() { setShowForm(false); setEditId(null); setForm(emptyForm); }
+
+  async function saveLink(userId: string) {
+    setLinkSaving(true);
+    try {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ teamMemberId: linkSelectValue }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        alert("Gagal menyimpan link: " + (err.error ?? JSON.stringify(err)));
+        return;
+      }
+      setTms((prev) => prev.map((tm) => {
+        if (tm.userId === userId) return { ...tm, userId: null };
+        if (tm.id === linkSelectValue) return { ...tm, userId };
+        return tm;
+      }));
+      setLinkingUserId(null);
+      setLinkSelectValue("");
+    } catch {
+      alert("Terjadi kesalahan jaringan.");
+    } finally {
+      setLinkSaving(false);
+    }
+  }
 
   async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -270,15 +300,52 @@ export default function UserManager({ initialUsers, teamMembers }: { initialUser
                         <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${ROLE_COLORS[user.role] ?? "bg-slate-100 text-slate-600"}`}>
                           {ROLE_EMOJI[user.role]} {ROLE_LABELS[user.role] ?? user.role}
                         </span>
-                        {user.role === "MEMBER" && tms.find((tm) => tm.userId === user.id) && (
-                          <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg">
-                            🔗 {tms.find((tm) => tm.userId === user.id)?.name}
-                          </span>
-                        )}
+                        {user.role === "MEMBER" && (() => {
+                          const linked = tms.find((tm) => tm.userId === user.id);
+                          return linked
+                            ? <span className="text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg">🔗 {linked.name}</span>
+                            : <span className="text-xs text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg">⚠️ Belum di-link</span>;
+                        })()}
                       </div>
+                      {/* Inline link UI */}
+                      {user.role === "MEMBER" && linkingUserId === user.id && (
+                        <div className="flex items-center gap-2 mt-2">
+                          <select
+                            value={linkSelectValue}
+                            onChange={(e) => setLinkSelectValue(e.target.value)}
+                            className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                          >
+                            <option value="">— Tidak ditautkan —</option>
+                            {tms.filter((tm) => tm.userId === null || tm.userId === user.id).map((tm) => (
+                              <option key={tm.id} value={tm.id}>{tm.name} ({tm.lead.division ?? "—"})</option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={() => saveLink(user.id)}
+                            disabled={linkSaving}
+                            className="text-xs font-semibold px-3 py-1 bg-amber-400 text-gray-900 rounded-lg shadow-[0_2px_0_#d97706] hover:shadow-[0_1px_0_#d97706] hover:translate-y-px transition-all disabled:opacity-50"
+                          >
+                            {linkSaving ? "⏳" : "💾 Simpan"}
+                          </button>
+                          <button onClick={() => { setLinkingUserId(null); setLinkSelectValue(""); }} className="text-xs text-slate-400 hover:text-slate-600">✕</button>
+                        </div>
+                      )}
                     </td>
                     <td className="px-5 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
+                        {user.role === "MEMBER" && (
+                          <button
+                            onClick={() => {
+                              const linked = tms.find((tm) => tm.userId === user.id);
+                              setLinkingUserId(linkingUserId === user.id ? null : user.id);
+                              setLinkSelectValue(linked?.id ?? "");
+                            }}
+                            className="text-xs font-semibold text-blue-600 px-2 py-1 rounded-lg hover:bg-blue-50 border border-blue-200 transition"
+                            title="Link ke anggota tim"
+                          >
+                            🔗
+                          </button>
+                        )}
                         <button
                           onClick={() => startEdit(user)}
                           className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100
