@@ -109,10 +109,14 @@ export async function POST(req: Request) {
     const roleRaw = readStr(row.getCell(4)).trim().toUpperCase();
     const division = readStr(row.getCell(5)).trim() || null;
 
+    // Skip empty rows and note rows (e.g. "Catatan: ...")
     if (!name && !email) continue;
+    if (!email.includes("@")) {
+      if (name.startsWith("Catatan") || name.startsWith("Note") || !name) continue;
+      errors.push(`Baris ${rowNum} "${name}": Email tidak valid (harus format xxx@domain.com).`);
+      continue;
+    }
     if (!name) { errors.push(`Baris ${rowNum}: Nama kosong, dilewati.`); continue; }
-    if (!email) { errors.push(`Baris ${rowNum} "${name}": Email kosong, dilewati.`); continue; }
-    if (!email.includes("@")) { errors.push(`Baris ${rowNum} "${name}": Email tidak valid.`); continue; }
 
     const role = VALID_ROLES.includes(roleRaw) ? roleRaw : "MEMBER";
 
