@@ -142,7 +142,7 @@ export default function UserManager({ initialUsers, teamMembers }: { initialUser
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
   const [importing, setImporting] = useState(false);
-  const [importResult, setImportResult] = useState<{ type: "success" | "error"; message: string; errors?: string[] } | null>(null);
+  const [importResult, setImportResult] = useState<{ type: "success" | "error"; message: string; errors?: string[]; linkLog?: string[] } | null>(null);
   const [linkingUserId, setLinkingUserId] = useState<string | null>(null);
   const [linkSelectValue, setLinkSelectValue] = useState("");
   const [linkSaving, setLinkSaving] = useState(false);
@@ -188,11 +188,14 @@ export default function UserManager({ initialUsers, teamMembers }: { initialUser
       const res = await fetch("/api/users/import", { method: "POST", body: fd });
       const data = await res.json();
       if (res.ok && data.success) {
-        setImportResult({ type: "success", message: data.message, errors: data.errors });
+        setImportResult({ type: "success", message: data.message, errors: data.errors, linkLog: data.linkLog });
         const reloaded = await fetch("/api/users").then((r) => r.json());
         setUsers(Array.isArray(reloaded) ? reloaded : []);
+        // Reload tms to reflect new links
+        const reloadedTms = await fetch("/api/admin/team-members").then((r) => r.json()).catch(() => null);
+        if (Array.isArray(reloadedTms)) setTms(reloadedTms);
       } else {
-        setImportResult({ type: "error", message: data.error ?? "Import gagal.", errors: data.errors });
+        setImportResult({ type: "error", message: data.error ?? "Import gagal.", errors: data.errors, linkLog: data.linkLog });
       }
     } catch {
       setImportResult({ type: "error", message: "Terjadi kesalahan jaringan." });
@@ -275,6 +278,12 @@ export default function UserManager({ initialUsers, teamMembers }: { initialUser
         <div className={`rounded-xl px-4 py-3 text-sm mb-4 ${importResult.type === "success" ? "bg-green-50 border border-green-200 text-green-700" : "bg-red-50 border border-red-200 text-red-700"}`}>
           <p className="font-semibold">{importResult.type === "success" ? "✅" : "❌"} {importResult.message}</p>
           {importResult.errors?.map((e, i) => <p key={i} className="text-xs mt-0.5">{e}</p>)}
+          {importResult.linkLog && importResult.linkLog.length > 0 && (
+            <details className="mt-2">
+              <summary className="text-xs font-semibold cursor-pointer opacity-70">🔗 Detail auto-link ({importResult.linkLog.length})</summary>
+              {importResult.linkLog.map((l, i) => <p key={i} className="text-xs mt-0.5 font-mono">{l}</p>)}
+            </details>
+          )}
         </div>
       )}
 
