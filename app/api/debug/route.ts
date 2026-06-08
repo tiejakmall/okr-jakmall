@@ -16,9 +16,22 @@ export async function POST(req: Request) {
   }
 }
 
-export async function GET() {
+// Admin shortcut: /api/debug?link=userId,teamMemberId
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const linkParam = url.searchParams.get("link");
   try {
     const session = await auth();
+
+    // Force-link shortcut for admin
+    if (linkParam && session?.user.role === "ADMIN") {
+      const [userId, teamMemberId] = linkParam.split(",");
+      const existing = await prisma.teamMember.findUnique({ where: { userId } });
+      if (existing) await prisma.teamMember.update({ where: { id: existing.id }, data: { userId: null } });
+      const result = await prisma.teamMember.update({ where: { id: teamMemberId }, data: { userId } });
+      return Response.json({ ok: true, action: "linked", member: result.name, userId, teamMemberId });
+    }
+
     const userCount = await prisma.user.count();
 
     // Member link debug info
