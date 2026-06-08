@@ -100,13 +100,16 @@ export default function MemberProgress({ quarters, initialQuarterId }: Props) {
   const [objectives, setObjectives] = useState<ObjItem[]>([]);
   const [linked, setLinked] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     if (!selectedQ) return;
     setLoading(true);
+    setError(false);
     fetch(`/api/member/my-assignments?quarterId=${selectedQ}`)
-      .then((r) => r.json())
-      .then((d) => { setLinked(d.linked); setObjectives(d.objectives ?? []); })
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((d) => { setLinked(d.linked ?? false); setObjectives(d.objectives ?? []); })
+      .catch(() => setError(true))
       .finally(() => setLoading(false));
   }, [selectedQ]);
 
@@ -154,6 +157,12 @@ export default function MemberProgress({ quarters, initialQuarterId }: Props) {
       {loading && (
         <div className="flex items-center justify-center py-16 text-slate-400">
           <span className="text-2xl animate-spin mr-3">⏳</span> Memuat...
+        </div>
+      )}
+
+      {!loading && error && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-center text-red-700 text-sm">
+          ❌ Gagal memuat data. Coba refresh halaman.
         </div>
       )}
 

@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
         },
       },
     },
-    orderBy: { objective: { createdAt: "asc" } },
+    orderBy: { id: "asc" },
   });
 
   // Group by objective
