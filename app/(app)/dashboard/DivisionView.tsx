@@ -73,9 +73,12 @@ function RadarObjectivesChart({ objectives }: { objectives: ObjData[] }) {
           <Tooltip formatter={(v: unknown) => `${(v as number).toFixed(1)}%`} contentStyle={{ fontSize: "11px", padding: "4px 10px", borderRadius: "8px", border: "1px solid #e2e8f0" }} />
         </RadarChart>
       </ResponsiveContainer>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1 mt-3">
         {objectives.map((o, i) => (
-          <p key={o.id} className="text-xs text-slate-500"><span className="font-semibold text-slate-700">OBJ {i + 1}:</span> {o.title.length > 28 ? o.title.slice(0, 28) + "…" : o.title}</p>
+          <p key={o.id} className="text-xs text-slate-500 truncate">
+            <span className="font-semibold text-slate-700">OBJ {i + 1}:</span>{" "}
+            {o.title.length > 30 ? o.title.slice(0, 30) + "…" : o.title}
+          </p>
         ))}
       </div>
     </div>
