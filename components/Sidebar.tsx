@@ -6,7 +6,6 @@ import { signOut } from "next-auth/react";
 
 const memberNav = [
   { href: "/dashboard", label: "Dashboard", emoji: "📊" },
-  { href: "/okr", label: "OKR Saya", emoji: "🎯" },
 ];
 
 const leadNav = [

@@ -11,6 +11,13 @@ type User = {
   division: string | null;
   createdAt: string;
 };
+type TeamMemberOption = {
+  id: string;
+  name: string;
+  leadId: string;
+  userId: string | null;
+  lead: { division: string | null };
+};
 
 type FormState = {
   name: string;
@@ -18,9 +25,10 @@ type FormState = {
   password: string;
   role: string;
   division: string;
+  teamMemberId: string;
 };
 
-const emptyForm: FormState = { name: "", email: "", password: "", role: "MEMBER", division: "" };
+const emptyForm: FormState = { name: "", email: "", password: "", role: "MEMBER", division: "", teamMemberId: "" };
 
 const ROLE_LABELS: Record<string, string> = { ADMIN: "Admin", LEAD: "Lead Divisi", MEMBER: "Member" };
 const ROLE_COLORS: Record<string, string> = {
@@ -43,13 +51,20 @@ const btnSecondary =
 const inputCls =
   "w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white transition";
 
-function UserForm({ form, isEdit, onChange, onSave, onCancel }: {
+function UserForm({ form, isEdit, onChange, onSave, onCancel, teamMembers, editUserId }: {
   form: FormState;
   isEdit: boolean;
   onChange: (f: FormState) => void;
   onSave: () => void;
   onCancel: () => void;
+  teamMembers: TeamMemberOption[];
+  editUserId?: string;
 }) {
+  // Available team members: unlinked, OR linked to this user being edited
+  const availableTeamMembers = teamMembers.filter(
+    (tm) => tm.userId === null || tm.userId === editUserId
+  );
+
   return (
     <div className="bg-white rounded-2xl border border-amber-200 p-6 mb-5">
       <h2 className="font-semibold text-slate-800 mb-4">
@@ -73,7 +88,7 @@ function UserForm({ form, isEdit, onChange, onSave, onCancel }: {
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-500 mb-1.5">🎭 Role</label>
-          <select className={inputCls} value={form.role} onChange={(e) => onChange({ ...form, role: e.target.value })}>
+          <select className={inputCls} value={form.role} onChange={(e) => onChange({ ...form, role: e.target.value, teamMemberId: "" })}>
             <option value="MEMBER">👤 Member (anggota divisi)</option>
             <option value="LEAD">⭐ Lead Divisi</option>
             <option value="ADMIN">🛡️ Admin (HR)</option>
@@ -88,6 +103,29 @@ function UserForm({ form, isEdit, onChange, onSave, onCancel }: {
           </label>
           <input className={inputCls} value={form.division} onChange={(e) => onChange({ ...form, division: e.target.value })} placeholder="contoh: Designer Brand, Content Creator, Visual Designer" />
         </div>
+        {form.role === "MEMBER" && (
+          <div className="col-span-2">
+            <label className="block text-xs font-medium text-slate-500 mb-1.5">
+              🔗 Link ke Anggota Tim
+              <span className="text-slate-400 font-normal ml-1">— hubungkan ke data distribusi OKR dari Lead</span>
+            </label>
+            <select
+              className={inputCls}
+              value={form.teamMemberId}
+              onChange={(e) => onChange({ ...form, teamMemberId: e.target.value })}
+            >
+              <option value="">— Tidak ditautkan —</option>
+              {availableTeamMembers.map((tm) => (
+                <option key={tm.id} value={tm.id}>
+                  {tm.name} ({tm.lead.division ?? "Tanpa Divisi"})
+                </option>
+              ))}
+            </select>
+            {availableTeamMembers.length === 0 && (
+              <p className="text-xs text-slate-400 mt-1">Belum ada anggota tim yang bisa ditautkan. Tambahkan dulu di halaman Distribusi Anggota.</p>
+            )}
+          </div>
+        )}
       </div>
       <div className="flex gap-2 mt-5">
         <button onClick={onSave} className={btnPrimary}>💾 Simpan</button>
@@ -97,8 +135,9 @@ function UserForm({ form, isEdit, onChange, onSave, onCancel }: {
   );
 }
 
-export default function UserManager({ initialUsers }: { initialUsers: User[] }) {
+export default function UserManager({ initialUsers, teamMembers }: { initialUsers: User[]; teamMembers: TeamMemberOption[] }) {
   const [users, setUsers] = useState<User[]>(initialUsers);
+  const [tms, setTms] = useState<TeamMemberOption[]>(teamMembers);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -139,16 +178,27 @@ export default function UserManager({ initialUsers }: { initialUsers: User[] }) 
     if (!res.ok) { alert((await res.json()).error ?? "Gagal membuat pengguna"); return; }
     const user = await res.json();
     setUsers((prev) => [...prev, user].sort((a, b) => a.name.localeCompare(b.name)));
+    if (form.teamMemberId) {
+      setTms((prev) => prev.map((tm) => tm.id === form.teamMemberId ? { ...tm, userId: user.id } : tm));
+    }
     cancel();
   }
 
   async function updateUser() {
     if (!editId) return;
-    const payload: Partial<FormState> = { name: form.name, email: form.email, role: form.role, division: form.division };
+    const payload: Partial<FormState & { teamMemberId: string }> = {
+      name: form.name, email: form.email, role: form.role, division: form.division, teamMemberId: form.teamMemberId,
+    };
     if (form.password) payload.password = form.password;
     const res = await fetch(`/api/users/${editId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     const updated = await res.json();
     setUsers((prev) => prev.map((u) => (u.id === editId ? updated : u)));
+    // Update local teamMembers state: clear old link, set new link
+    setTms((prev) => prev.map((tm) => {
+      if (tm.userId === editId) return { ...tm, userId: null };
+      if (tm.id === form.teamMemberId) return { ...tm, userId: editId };
+      return tm;
+    }));
     cancel();
   }
 
@@ -161,7 +211,8 @@ export default function UserManager({ initialUsers }: { initialUsers: User[] }) 
   function startEdit(user: User) {
     setEditId(user.id);
     setShowForm(false);
-    setForm({ name: user.name, email: user.email, password: "", role: user.role, division: user.division ?? "" });
+    const linkedTm = tms.find((tm) => tm.userId === user.id);
+    setForm({ name: user.name, email: user.email, password: "", role: user.role, division: user.division ?? "", teamMemberId: linkedTm?.id ?? "" });
   }
 
   const grouped = users.reduce<Record<string, User[]>>((acc, u) => {
@@ -197,8 +248,8 @@ export default function UserManager({ initialUsers }: { initialUsers: User[] }) 
         </div>
       )}
 
-      {showForm && <UserForm form={form} isEdit={false} onChange={setForm} onSave={createUser} onCancel={cancel} />}
-      {editId && <UserForm form={form} isEdit={true} onChange={setForm} onSave={updateUser} onCancel={cancel} />}
+      {showForm && <UserForm form={form} isEdit={false} onChange={setForm} onSave={createUser} onCancel={cancel} teamMembers={tms} />}
+      {editId && <UserForm form={form} isEdit={true} onChange={setForm} onSave={updateUser} onCancel={cancel} teamMembers={tms} editUserId={editId} />}
 
       <div className="space-y-4">
         {Object.entries(grouped).map(([division, divUsers]) => (
@@ -215,9 +266,16 @@ export default function UserManager({ initialUsers }: { initialUsers: User[] }) 
                     <td className="px-5 py-3 font-medium text-slate-800">{user.name}</td>
                     <td className="px-5 py-3 text-slate-500">{user.email}</td>
                     <td className="px-5 py-3">
-                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${ROLE_COLORS[user.role] ?? "bg-slate-100 text-slate-600"}`}>
-                        {ROLE_EMOJI[user.role]} {ROLE_LABELS[user.role] ?? user.role}
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg ${ROLE_COLORS[user.role] ?? "bg-slate-100 text-slate-600"}`}>
+                          {ROLE_EMOJI[user.role]} {ROLE_LABELS[user.role] ?? user.role}
+                        </span>
+                        {user.role === "MEMBER" && tms.find((tm) => tm.userId === user.id) && (
+                          <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg">
+                            🔗 {tms.find((tm) => tm.userId === user.id)?.name}
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-5 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">

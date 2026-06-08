@@ -12,10 +12,18 @@ export default async function UsersPage() {
     orderBy: { name: "asc" },
   });
 
+  const teamMembers = await prisma.teamMember.findMany({
+    select: { id: true, name: true, leadId: true, userId: true, lead: { select: { division: true } } },
+    orderBy: { name: "asc" },
+  });
+
   return (
     <div>
       <h1 className="text-xl font-bold text-slate-900 mb-6">Manajemen Pengguna</h1>
-      <UserManager initialUsers={JSON.parse(JSON.stringify(users))} />
+      <UserManager
+        initialUsers={JSON.parse(JSON.stringify(users))}
+        teamMembers={JSON.parse(JSON.stringify(teamMembers))}
+      />
     </div>
   );
 }

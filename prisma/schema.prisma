@@ -19,16 +19,17 @@ enum OKRStatus {
 }
 
 model User {
-  id          String       @id @default(cuid())
-  name        String
-  email       String       @unique
-  password    String
-  role        Role         @default(MEMBER)
-  division    String?
-  objectives  Objective[]
-  teamMembers TeamMember[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id             String       @id @default(cuid())
+  name           String
+  email          String       @unique
+  password       String
+  role           Role         @default(MEMBER)
+  division       String?
+  objectives     Objective[]
+  teamMembers    TeamMember[] @relation("LeadTeamMembers")
+  teamMembership TeamMember?  @relation("MemberUserLink")
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 }
 
 model Quarter {
@@ -82,7 +83,9 @@ model TeamMember {
   id          String                @id @default(cuid())
   name        String
   leadId      String
-  lead        User                  @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  lead        User                  @relation("LeadTeamMembers", fields: [leadId], references: [id], onDelete: Cascade)
+  userId      String?               @unique
+  user        User?                 @relation("MemberUserLink", fields: [userId], references: [id], onDelete: SetNull)
   assignments ObjectiveAssignment[]
   createdAt   DateTime              @default(now())
 }

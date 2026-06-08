@@ -24,6 +24,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     data,
     select: { id: true, name: true, email: true, role: true, division: true, createdAt: true },
   });
+
+  // Handle TeamMember link
+  if (body.teamMemberId !== undefined) {
+    // Clear any existing link for this user
+    await prisma.teamMember.updateMany({ where: { userId: id }, data: { userId: null } });
+    // Set new link if provided
+    if (body.teamMemberId) {
+      await prisma.teamMember.update({ where: { id: body.teamMemberId }, data: { userId: id } });
+    }
+  }
+
   return NextResponse.json(user);
 }
 

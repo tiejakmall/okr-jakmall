@@ -1,18 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import MemberDashboard from "./MemberDashboard";
+import MemberProgress from "./MemberProgress";
 import DivisionView from "./DivisionView";
-
-type Objective = {
-  id: string; title: string; weight: number; status: string;
-  keyResults: { id: string; title: string; target: number; unit: string; weight: number; teamProgress: number; leadProgress: number | null }[];
-};
 
 type Props = {
   quarters: { id: string; name: string; isActive: boolean }[];
-  userId: string;
-  initialObjectives: Objective[];
   initialQuarterId: string;
   leadId: string | null;
   divisionName: string | null;
@@ -20,7 +13,7 @@ type Props = {
 
 type Tab = "divisi" | "progress";
 
-export default function MemberView({ quarters, userId, initialObjectives, initialQuarterId, leadId, divisionName }: Props) {
+export default function MemberView({ quarters, initialQuarterId, leadId, divisionName }: Props) {
   const [tab, setTab] = useState<Tab>(leadId ? "divisi" : "progress");
 
   return (
@@ -61,10 +54,8 @@ export default function MemberView({ quarters, userId, initialObjectives, initia
       )}
 
       {tab === "progress" && (
-        <MemberDashboard
+        <MemberProgress
           quarters={quarters}
-          userId={userId}
-          initialObjectives={initialObjectives}
           initialQuarterId={initialQuarterId}
         />
       )}

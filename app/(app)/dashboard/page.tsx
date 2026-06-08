@@ -32,14 +32,6 @@ export default async function DashboardPage() {
   /* ─── MEMBER ─── */
   if (role === "MEMBER") {
     const activeQuarter = quarters.find((q) => q.isActive) ?? quarters[0];
-    const myObjectives = activeQuarter
-      ? await prisma.objective.findMany({
-          where: { userId: session!.user.id, quarterId: activeQuarter.id },
-          include: { keyResults: true },
-          orderBy: { createdAt: "asc" },
-        })
-      : [];
-
     const myLead = session!.user.division
       ? await prisma.user.findFirst({ where: { role: "LEAD", division: session!.user.division }, select: { id: true, division: true } })
       : null;
@@ -47,8 +39,6 @@ export default async function DashboardPage() {
     return (
       <MemberView
         quarters={JSON.parse(JSON.stringify(quarters))}
-        userId={session!.user.id}
-        initialObjectives={JSON.parse(JSON.stringify(myObjectives))}
         initialQuarterId={activeQuarter?.id ?? ""}
         leadId={myLead?.id ?? null}
         divisionName={myLead?.division ?? session!.user.division ?? null}
