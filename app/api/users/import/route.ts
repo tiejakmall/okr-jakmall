@@ -144,28 +144,24 @@ export async function POST(req: Request) {
       if (role === "MEMBER" && division) {
         const alreadyLinked = await prisma.teamMember.findUnique({ where: { userId } });
         if (!alreadyLinked) {
-          // 1. Try exact match first
-          let match = await prisma.teamMember.findFirst({
-            where: { name: { equals: name, mode: "insensitive" }, userId: null, lead: { division } },
+          // Fetch all unlinked TeamMembers and filter in JS to avoid Prisma relational filter issues
+          const pool = await prisma.teamMember.findMany({
+            where: { userId: null },
+            include: { lead: { select: { division: true } } },
           });
-          // 2. Fallback: TeamMember name starts with import name (e.g. "Tievanto" → "Tievanto Yasser Alfatah")
-          if (!match) {
-            const candidates = await prisma.teamMember.findMany({
-              where: { name: { startsWith: name, mode: "insensitive" }, userId: null, lead: { division } },
-            });
-            if (candidates.length === 1) match = candidates[0];
-          }
-          // 3. Fallback: import name starts with TeamMember name (e.g. "Tievanto Yasser" → "Tievanto")
-          if (!match) {
-            const candidates = await prisma.teamMember.findMany({
-              where: { userId: null, lead: { division } },
-            });
-            const found = candidates.filter(tm =>
-              name.toLowerCase().startsWith(tm.name.toLowerCase()) ||
-              tm.name.toLowerCase().startsWith(name.toLowerCase())
-            );
-            if (found.length === 1) match = found[0];
-          }
+          const inDivision = pool.filter(
+            (tm) => tm.lead.division?.toLowerCase() === division.toLowerCase()
+          );
+
+          const nameLower = name.toLowerCase();
+          let match =
+            // 1. Exact match
+            inDivision.find((tm) => tm.name.toLowerCase() === nameLower) ??
+            // 2. TeamMember name starts with import name ("Tievanto" → "Tievanto Yasser Alfatah")
+            (() => { const c = inDivision.filter((tm) => tm.name.toLowerCase().startsWith(nameLower)); return c.length === 1 ? c[0] : undefined; })() ??
+            // 3. Import name starts with TeamMember name ("Tievanto Yasser" → "Tievanto")
+            (() => { const c = inDivision.filter((tm) => nameLower.startsWith(tm.name.toLowerCase())); return c.length === 1 ? c[0] : undefined; })();
+
           if (match) {
             await prisma.teamMember.update({ where: { id: match.id }, data: { userId } });
           }
