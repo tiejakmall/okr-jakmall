@@ -5,13 +5,21 @@ import { calcObjectiveAchievement, calcMemberAchievement, aggregateKRProgress } 
 
 export async function GET(req: Request) {
   const session = await auth();
-  if (!session || (session.user.role !== "LEAD" && session.user.role !== "ADMIN")) {
+  if (!session || !["LEAD", "ADMIN", "MEMBER"].includes(session.user.role)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);
   const quarterId = searchParams.get("quarterId");
-  const leadId = searchParams.get("leadId") ?? session.user.id;
+
+  // MEMBER: auto-resolve leadId from their division
+  let leadId = searchParams.get("leadId") ?? session.user.id;
+  if (session.user.role === "MEMBER") {
+    if (!session.user.division) return NextResponse.json({ error: "Division tidak ditemukan." }, { status: 404 });
+    const lead = await prisma.user.findFirst({ where: { role: "LEAD", division: session.user.division }, select: { id: true } });
+    if (!lead) return NextResponse.json({ error: "Lead divisi tidak ditemukan." }, { status: 404 });
+    leadId = lead.id;
+  }
 
   if (!quarterId) return NextResponse.json({ error: "quarterId required" }, { status: 400 });
 

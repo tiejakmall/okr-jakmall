@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import DivisionView from "./DivisionView";
 import IndividualView from "./IndividualView";
 import MemberDashboard from "./MemberDashboard";
+import MemberView from "./MemberView";
 import DashboardTabs from "./DashboardTabs";
 import AdminOverview from "./AdminOverview";
 
@@ -38,12 +39,19 @@ export default async function DashboardPage() {
           orderBy: { createdAt: "asc" },
         })
       : [];
+
+    const myLead = session!.user.division
+      ? await prisma.user.findFirst({ where: { role: "LEAD", division: session!.user.division }, select: { id: true, division: true } })
+      : null;
+
     return (
-      <MemberDashboard
+      <MemberView
         quarters={JSON.parse(JSON.stringify(quarters))}
         userId={session!.user.id}
         initialObjectives={JSON.parse(JSON.stringify(myObjectives))}
         initialQuarterId={activeQuarter?.id ?? ""}
+        leadId={myLead?.id ?? null}
+        divisionName={myLead?.division ?? session!.user.division ?? null}
       />
     );
   }
