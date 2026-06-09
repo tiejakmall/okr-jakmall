@@ -63,9 +63,26 @@ export async function GET(req: Request) {
       orderBy: { createdAt: "asc" },
     });
 
+    // Query for calculations (needs full objective shape)
     const members = await prisma.teamMember.findMany({
       where: { leadId: lead.id },
       include: { assignments: { include: { krAssignments: true } } },
+      orderBy: { name: "asc" },
+    });
+
+    // Query for per-member detail section (needs KR + objective titles)
+    const membersDetail = await prisma.teamMember.findMany({
+      where: { leadId: lead.id },
+      include: {
+        assignments: {
+          include: {
+            objective: { select: { title: true } },
+            krAssignments: {
+              include: { keyResult: { select: { title: true, unit: true, target: true } } },
+            },
+          },
+        },
+      },
       orderBy: { name: "asc" },
     });
 
@@ -162,6 +179,63 @@ export async function GET(req: Request) {
         const row = ws.addRow([i + 1, m.name, parseFloat(m.achievement.toFixed(1))]);
         row.getCell(3).fill = achFill(m.achievement);
       });
+    }
+
+    // ── Detail OKR per anggota ──────────────────────────────────────────────
+    if (membersDetail.length > 0) {
+      ws.addRow([]);
+      const sectionTitle = ws.addRow(["Detail OKR per Anggota"]);
+      sectionTitle.font = { bold: true, name: "Arial", size: 11 };
+
+      for (const member of membersDetail) {
+        const memberAch = calcMemberAchievement(
+          members.find((m) => m.id === member.id)?.assignments ?? [],
+          objectives
+        );
+        ws.addRow([]);
+
+        // Member name row
+        const memberRow = ws.addRow([`👤 ${member.name}`, "", `Pencapaian: ${memberAch.toFixed(1)}%`]);
+        memberRow.font = { bold: true, name: "Arial", size: 10, color: { argb: "FF1E293B" } };
+        memberRow.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF1F5F9" } };
+
+        if (member.assignments.length === 0) {
+          ws.addRow(["", "(Belum ada penugasan KR)"]);
+          continue;
+        }
+
+        // Column headers for this member
+        const memberHeader = ws.addRow([
+          "Objective", "Key Result", "Bobot (%)", "Target", "Satuan", "Progress", "Capaian (%)",
+        ]);
+        memberHeader.font = HEADER_FONT;
+        memberHeader.fill = HEADER_FILL;
+
+        for (const assignment of member.assignments) {
+          if (!assignment.objective) continue;
+          const objTitle = assignment.objective.title;
+          for (let i = 0; i < assignment.krAssignments.length; i++) {
+            const kra = assignment.krAssignments[i];
+            const effectiveTarget = kra.target ?? kra.keyResult.target;
+            const kraAch = effectiveTarget > 0
+              ? Math.min((kra.progress / effectiveTarget) * 100, 100)
+              : 0;
+            const row = ws.addRow([
+              i === 0 ? objTitle : "",
+              kra.keyResult.title,
+              kra.weight,
+              effectiveTarget,
+              kra.keyResult.unit,
+              parseFloat(kra.progress.toFixed(2)),
+              parseFloat(kraAch.toFixed(1)),
+            ]);
+            row.getCell(7).fill = achFill(kraAch);
+          }
+          if (assignment.krAssignments.length === 0) {
+            ws.addRow([objTitle, "(Tidak ada KR)"]);
+          }
+        }
+      }
     }
   }
 
