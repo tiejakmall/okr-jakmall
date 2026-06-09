@@ -32,10 +32,7 @@ export default function YearQuarterPicker({ quarters, value, onChange }: Props) 
 
   function handleYearChange(year: number) {
     setSelectedYear(year);
-    // Auto-select active quarter in new year, else first quarter
-    const qs = grouped.find((g) => g.year === year)?.quarters ?? [];
-    const target = qs.find((q) => q.isActive) ?? qs[0];
-    if (target) onChange(target.id);
+    // Just filter — do NOT auto-select; user picks the quarter explicitly
   }
 
   const yearBtn = (active: boolean) =>
