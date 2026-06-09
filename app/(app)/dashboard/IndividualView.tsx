@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { groupByYear } from "@/lib/quarter-group";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ReferenceLine,
@@ -220,7 +221,7 @@ function AssignmentSection({ a, index }: { a: AssignmentData; index: number }) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 type Props = {
-  quarters: { id: string; name: string; isActive: boolean }[];
+  quarters: { id: string; name: string; year: number; isActive: boolean }[];
   members: { id: string; name: string }[];
   leadId: string;
   defaultQuarterId?: string;
@@ -274,10 +275,14 @@ export default function IndividualView({ quarters, members, leadId, defaultQuart
               className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white
                 shadow-[0_2px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-px transition-all duration-75"
             >
-              {quarters.map((q) => (
-                <option key={q.id} value={q.id}>
-                  {q.name}{q.isActive ? " ✅" : ""}
-                </option>
+              {groupByYear(quarters).map(({ year, quarters: qs }) => (
+                <optgroup key={year} label={`📅 ${year}`}>
+                  {qs.map((q) => (
+                    <option key={q.id} value={q.id}>
+                      {q.name}{q.isActive ? " ✅" : ""}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>

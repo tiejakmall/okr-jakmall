@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { groupByYear } from "@/lib/quarter-group";
 
-type Quarter = { id: string; name: string; isActive: boolean };
+type Quarter = { id: string; name: string; year: number; isActive: boolean };
 type LeadStatus = "complete" | "incomplete" | "empty";
 type Lead = {
   id: string;
@@ -93,8 +94,12 @@ export default function ReminderManager({
           onChange={(e) => { setSelectedQuarterId(e.target.value); setResult(null); }}
         >
           <option value="">-- Pilih Quarter --</option>
-          {quarters.map((q) => (
-            <option key={q.id} value={q.id}>{q.name}{q.isActive ? " ✅" : ""}</option>
+          {groupByYear(quarters).map(({ year, quarters: qs }) => (
+            <optgroup key={year} label={`📅 ${year}`}>
+              {qs.map((q) => (
+                <option key={q.id} value={q.id}>{q.name}{q.isActive ? " ✅" : ""}</option>
+              ))}
+            </optgroup>
           ))}
         </select>
       </div>

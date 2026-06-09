@@ -18,7 +18,7 @@ export default async function RemindersPage() {
 
   const quarters = await prisma.quarter.findMany({
     orderBy: [{ year: "desc" }, { quarter: "desc" }],
-    select: { id: true, name: true, isActive: true },
+    select: { id: true, name: true, year: true, isActive: true },
   });
 
   const activeQuarter = quarters.find((q) => q.isActive) ?? quarters[0];

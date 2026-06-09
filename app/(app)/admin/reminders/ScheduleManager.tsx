@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { groupByYear } from "@/lib/quarter-group";
 
-type Quarter = { id: string; name: string; isActive: boolean };
+type Quarter = { id: string; name: string; year: number; isActive: boolean };
 type Schedule = {
   id: string;
   type: string;
@@ -109,7 +110,11 @@ export default function ScheduleManager({ quarters, initialSchedules }: { quarte
             <label className="text-xs font-semibold text-slate-500">Quarter</label>
             <select value={quarterId} onChange={e => setQuarterId(e.target.value)}
               className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-amber-400">
-              {quarters.map(q => <option key={q.id} value={q.id}>{q.name}{q.isActive ? " ✅" : ""}</option>)}
+              {groupByYear(quarters).map(({ year, quarters: qs }) => (
+                <optgroup key={year} label={`📅 ${year}`}>
+                  {qs.map(q => <option key={q.id} value={q.id}>{q.name}{q.isActive ? " ✅" : ""}</option>)}
+                </optgroup>
+              ))}
             </select>
           </div>
 

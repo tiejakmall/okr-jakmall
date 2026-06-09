@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
+import { groupByYear } from "@/lib/quarter-group";
 
 type Quarter = {
   id: string;
@@ -112,47 +113,56 @@ export default function QuarterManager({ initialQuarters }: { initialQuarters: Q
         </div>
       )}
 
-      <div className="space-y-3">
-        {quarters.map((q) => (
-          <div key={q.id} className={`bg-white rounded-2xl border p-5 flex items-center justify-between ${q.isActive ? "border-amber-300" : "border-slate-200"}`}>
-            <div>
-              <div className="flex items-center gap-2.5 mb-1">
-                <h3 className="font-semibold text-slate-800">⏱️ {q.name}</h3>
-                {q.isActive && <span className="bg-amber-400 text-gray-900 text-xs font-bold px-2.5 py-0.5 rounded-full">✅ Aktif</span>}
-              </div>
-              <p className="text-xs text-slate-400">
-                📅 {new Date(q.startDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })} –{" "}
-                {new Date(q.endDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => toggleActive(q)}
-                className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-xl font-semibold transition-all duration-75 ${
-                  q.isActive
-                    ? "bg-amber-100 text-amber-700 shadow-[0_3px_0_#fbbf24] hover:shadow-[0_1px_0_#fbbf24] hover:translate-y-0.5 active:shadow-none active:translate-y-[3px]"
-                    : "bg-white border border-slate-200 text-slate-600 shadow-[0_3px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-0.5 active:shadow-none active:translate-y-[3px]"
-                }`}
-              >
-                {q.isActive ? "✅ Aktif" : "▶️ Set Aktif"}
-              </button>
-              <button
-                onClick={() => deleteQuarter(q.id)}
-                className="text-slate-300 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50
-                  shadow-[0_3px_0_#e2e8f0] hover:shadow-[0_1px_0_#fecaca] hover:translate-y-0.5
-                  active:shadow-none active:translate-y-[3px] transition-all duration-75"
-              >
-                <Trash2 size={15} />
-              </button>
-            </div>
-          </div>
-        ))}
-
-        {quarters.length === 0 && (
+      <div className="space-y-6">
+        {quarters.length === 0 ? (
           <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
             <div className="text-4xl mb-3">⏱️</div>
             <p className="text-slate-500 text-sm">Belum ada quarter. Tambah quarter pertama.</p>
           </div>
+        ) : (
+          groupByYear(quarters).map(({ year, quarters: qs }) => (
+            <div key={year}>
+              <h2 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-3 px-1">
+                📅 {year}
+              </h2>
+              <div className="space-y-3">
+                {qs.map((q) => (
+                  <div key={q.id} className={`bg-white rounded-2xl border p-5 flex items-center justify-between ${q.isActive ? "border-amber-300" : "border-slate-200"}`}>
+                    <div>
+                      <div className="flex items-center gap-2.5 mb-1">
+                        <h3 className="font-semibold text-slate-800">⏱️ {q.name}</h3>
+                        {q.isActive && <span className="bg-amber-400 text-gray-900 text-xs font-bold px-2.5 py-0.5 rounded-full">✅ Aktif</span>}
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        📅 {new Date(q.startDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })} –{" "}
+                        {new Date(q.endDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => toggleActive(q)}
+                        className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-xl font-semibold transition-all duration-75 ${
+                          q.isActive
+                            ? "bg-amber-100 text-amber-700 shadow-[0_3px_0_#fbbf24] hover:shadow-[0_1px_0_#fbbf24] hover:translate-y-0.5 active:shadow-none active:translate-y-[3px]"
+                            : "bg-white border border-slate-200 text-slate-600 shadow-[0_3px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-0.5 active:shadow-none active:translate-y-[3px]"
+                        }`}
+                      >
+                        {q.isActive ? "✅ Aktif" : "▶️ Set Aktif"}
+                      </button>
+                      <button
+                        onClick={() => deleteQuarter(q.id)}
+                        className="text-slate-300 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50
+                          shadow-[0_3px_0_#e2e8f0] hover:shadow-[0_1px_0_#fecaca] hover:translate-y-0.5
+                          active:shadow-none active:translate-y-[3px] transition-all duration-75"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))
         )}
       </div>
     </div>

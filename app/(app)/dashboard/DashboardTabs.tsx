@@ -6,7 +6,7 @@ import IndividualView from "./IndividualView";
 
 type Props = {
   title: string;
-  quarters: { id: string; name: string; isActive: boolean }[];
+  quarters: { id: string; name: string; year: number; isActive: boolean }[];
   members: { id: string; name: string }[];
   leadId: string;
   defaultQuarterId?: string;

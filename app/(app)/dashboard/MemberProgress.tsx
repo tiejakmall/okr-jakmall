@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { groupByYear } from "@/lib/quarter-group";
 
 type KRItem = { id: string; title: string; target: number; unit: string; weight: number; progress: number; achievement: number };
 type ObjItem = { id: string; title: string; weight: number; krs: KRItem[] };
@@ -91,7 +92,7 @@ function ObjCard({ obj, index }: { obj: ObjItem; index: number }) {
 }
 
 type Props = {
-  quarters: { id: string; name: string; isActive: boolean }[];
+  quarters: { id: string; name: string; year: number; isActive: boolean }[];
   initialQuarterId: string;
 };
 
@@ -140,8 +141,12 @@ export default function MemberProgress({ quarters, initialQuarterId }: Props) {
               onChange={(e) => setSelectedQ(e.target.value)}
               className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white shadow-[0_2px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-px transition-all duration-75"
             >
-              {quarters.map((q) => (
-                <option key={q.id} value={q.id}>{q.name}{q.isActive ? " ✅" : ""}</option>
+              {groupByYear(quarters).map(({ year, quarters: qs }) => (
+                <optgroup key={year} label={`📅 ${year}`}>
+                  {qs.map((q) => (
+                    <option key={q.id} value={q.id}>{q.name}{q.isActive ? " ✅" : ""}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
