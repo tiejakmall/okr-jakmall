@@ -50,9 +50,9 @@ export default function YearQuarterPicker({ quarters, value, onChange }: Props) 
       : "bg-white border border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-700 shadow-[0_2px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-px");
 
   return (
-    <div className="flex items-center gap-3 flex-wrap">
-      {/* Year pills */}
-      <div className="flex gap-1.5">
+    <div className="flex flex-col gap-1.5">
+      {/* Year pills — wrap naturally if many years */}
+      <div className="flex gap-1.5 flex-wrap">
         {years.map((y) => (
           <button key={y} onClick={() => handleYearChange(y)} className={yearBtn(y === selectedYear)}>
             {y}
@@ -60,23 +60,20 @@ export default function YearQuarterPicker({ quarters, value, onChange }: Props) 
         ))}
       </div>
 
-      {/* Divider */}
+      {/* Quarter pills — max 4, always compact */}
       {yearQuarters.length > 0 && (
-        <span className="text-slate-300 text-sm select-none">›</span>
+        <div className="flex gap-1.5">
+          {yearQuarters.map((q) => (
+            <button
+              key={q.id}
+              onClick={() => onChange(q.id)}
+              className={qBtn(q.id === value, q.isActive)}
+            >
+              Q{q.quarter}{q.isActive ? " ✅" : ""}
+            </button>
+          ))}
+        </div>
       )}
-
-      {/* Quarter pills */}
-      <div className="flex gap-1.5">
-        {yearQuarters.map((q) => (
-          <button
-            key={q.id}
-            onClick={() => onChange(q.id)}
-            className={qBtn(q.id === value, q.isActive)}
-          >
-            Q{q.quarter}{q.isActive ? " ✅" : ""}
-          </button>
-        ))}
-      </div>
     </div>
   );
 }
