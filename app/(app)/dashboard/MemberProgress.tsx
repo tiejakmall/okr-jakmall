@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { groupByYear } from "@/lib/quarter-group";
+import YearQuarterPicker from "@/components/YearQuarterPicker";
 
 type KRItem = { id: string; title: string; target: number; unit: string; weight: number; progress: number; achievement: number };
 type ObjItem = { id: string; title: string; weight: number; krs: KRItem[] };
@@ -92,7 +92,7 @@ function ObjCard({ obj, index }: { obj: ObjItem; index: number }) {
 }
 
 type Props = {
-  quarters: { id: string; name: string; year: number; isActive: boolean }[];
+  quarters: { id: string; name: string; year: number; quarter: number; isActive: boolean }[];
   initialQuarterId: string;
 };
 
@@ -135,20 +135,8 @@ export default function MemberProgress({ quarters, initialQuarterId }: Props) {
         <div>
           <h2 className="text-lg font-bold text-slate-900">🎯 Progress OKR Saya</h2>
           <div className="flex items-center gap-2 mt-2">
-            <span className="text-xs text-slate-400">⏱️ Quarter:</span>
-            <select
-              value={selectedQ}
-              onChange={(e) => setSelectedQ(e.target.value)}
-              className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white shadow-[0_2px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-px transition-all duration-75"
-            >
-              {groupByYear(quarters).map(({ year, quarters: qs }) => (
-                <optgroup key={year} label={`📅 ${year}`}>
-                  {qs.map((q) => (
-                    <option key={q.id} value={q.id}>{q.name}{q.isActive ? " ✅" : ""}</option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+            <span className="text-xs text-slate-400 flex-shrink-0">⏱️ Quarter:</span>
+            <YearQuarterPicker quarters={quarters} value={selectedQ} onChange={setSelectedQ} />
           </div>
         </div>
         {objectives.length > 0 && !loading && (

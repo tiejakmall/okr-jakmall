@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronDown, Plus, X } from "lucide-react";
-import { groupByYear } from "@/lib/quarter-group";
+import { Plus, X } from "lucide-react";
+import YearQuarterPicker from "@/components/YearQuarterPicker";
 
 type Quarter = {
   id: string;
@@ -37,10 +37,6 @@ export default function QuarterSelector({
     startDate: "",
     endDate: "",
   });
-
-  function handleSelect(e: React.ChangeEvent<HTMLSelectElement>) {
-    window.location.href = `${basePath}?quarterId=${e.target.value}`;
-  }
 
   async function createQuarter() {
     if (!form.name || !form.startDate || !form.endDate) return;
@@ -79,31 +75,17 @@ export default function QuarterSelector({
         <span className="text-sm font-semibold text-slate-600 flex-shrink-0">⏱️ Quarter:</span>
 
         {quarters.length > 0 ? (
-          <div className="relative flex-1 min-w-[180px] max-w-xs">
-            <select
-              value={selectedQuarterId ?? ""}
-              onChange={handleSelect}
-              className="w-full appearance-none border border-slate-200 rounded-xl px-3 py-2 pr-8 text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white cursor-pointer"
-            >
-              {!selectedQuarterId && <option value="">-- Pilih Quarter --</option>}
-              {groupByYear(quarters).map(({ year, quarters: qs }) => (
-                <optgroup key={year} label={`📅 ${year}`}>
-                  {qs.map((q) => (
-                    <option key={q.id} value={q.id}>
-                      {q.name}{q.isActive ? " ✅" : ""}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          </div>
+          <YearQuarterPicker
+            quarters={quarters}
+            value={selectedQuarterId ?? ""}
+            onChange={(id) => { window.location.href = `${basePath}?quarterId=${id}`; }}
+          />
         ) : (
           <span className="text-sm text-slate-400 italic">Belum ada quarter</span>
         )}
 
         {selectedQuarter && (
-          <span className="text-xs text-slate-400">
+          <span className="text-xs text-slate-400 flex-shrink-0">
             📅 {new Date(selectedQuarter.startDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
             {" – "}
             {new Date(selectedQuarter.endDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}

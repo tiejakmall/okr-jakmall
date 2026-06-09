@@ -5,7 +5,7 @@ import MemberProgress from "./MemberProgress";
 import DivisionView from "./DivisionView";
 
 type Props = {
-  quarters: { id: string; name: string; year: number; isActive: boolean }[];
+  quarters: { id: string; name: string; year: number; quarter: number; isActive: boolean }[];
   initialQuarterId: string;
   leadId: string | null;
   divisionName: string | null;

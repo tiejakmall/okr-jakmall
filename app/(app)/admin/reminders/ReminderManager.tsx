@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { groupByYear } from "@/lib/quarter-group";
+import YearQuarterPicker from "@/components/YearQuarterPicker";
 
-type Quarter = { id: string; name: string; year: number; isActive: boolean };
+type Quarter = { id: string; name: string; year: number; quarter: number; isActive: boolean };
 type LeadStatus = "complete" | "incomplete" | "empty";
 type Lead = {
   id: string;
@@ -88,20 +88,11 @@ export default function ReminderManager({
       {/* Quarter selector */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5">
         <label className="block text-sm font-semibold text-slate-700 mb-2">⏱️ Pilih Quarter</label>
-        <select
-          className="w-full max-w-xs border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+        <YearQuarterPicker
+          quarters={quarters}
           value={selectedQuarterId}
-          onChange={(e) => { setSelectedQuarterId(e.target.value); setResult(null); }}
-        >
-          <option value="">-- Pilih Quarter --</option>
-          {groupByYear(quarters).map(({ year, quarters: qs }) => (
-            <optgroup key={year} label={`📅 ${year}`}>
-              {qs.map((q) => (
-                <option key={q.id} value={q.id}>{q.name}{q.isActive ? " ✅" : ""}</option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+          onChange={(id) => { setSelectedQuarterId(id); setResult(null); }}
+        />
       </div>
 
       {/* Reminder cards */}

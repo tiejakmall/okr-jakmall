@@ -3,10 +3,10 @@
 import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import DashboardTabs from "./DashboardTabs";
-import { groupByYear } from "@/lib/quarter-group";
+import YearQuarterPicker from "@/components/YearQuarterPicker";
 
 type Lead = { id: string; name: string; division: string | null };
-type Quarter = { id: string; name: string; year: number; isActive: boolean };
+type Quarter = { id: string; name: string; year: number; quarter: number; isActive: boolean };
 type Summary = {
   leadId: string;
   name: string;
@@ -85,21 +85,7 @@ export default function AdminOverview({ leads, quarters, allMembersByLead }: Pro
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <select
-            value={selectedQ}
-            onChange={(e) => { setSelectedQ(e.target.value); setExpandedId(null); }}
-            className="border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white shadow-[0_2px_0_#e2e8f0]"
-          >
-            {groupByYear(quarters).map(({ year, quarters: qs }) => (
-              <optgroup key={year} label={`📅 ${year}`}>
-                {qs.map((q) => (
-                  <option key={q.id} value={q.id}>
-                    {q.name}{q.isActive ? " ✅" : ""}
-                  </option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
+          <YearQuarterPicker quarters={quarters} value={selectedQ} onChange={(id) => { setSelectedQ(id); setExpandedId(null); }} />
         </div>
       </div>
 

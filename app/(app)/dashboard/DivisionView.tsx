@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { groupByYear } from "@/lib/quarter-group";
+import YearQuarterPicker from "@/components/YearQuarterPicker";
 import {
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell,
@@ -371,7 +371,7 @@ function ObjectiveSection({ obj, index }: { obj: ObjData; index: number }) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 type Props = {
-  quarters: { id: string; name: string; year: number; isActive: boolean }[];
+  quarters: { id: string; name: string; year: number; quarter: number; isActive: boolean }[];
   leadId: string;
   divisionName: string;
   defaultQuarterId?: string;
@@ -405,24 +405,9 @@ export default function DivisionView({ quarters, leadId, divisionName, defaultQu
         <div>
           <h1 className="text-xl font-bold text-slate-900">📊 {divisionName}</h1>
           {/* Quarter selector */}
-          <div className="flex items-center gap-2 mt-2">
-            <span className="text-xs text-slate-400">⏱️ Quarter:</span>
-            <select
-              value={selectedQ}
-              onChange={(e) => setSelectedQ(e.target.value)}
-              className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white
-                shadow-[0_2px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-px transition-all duration-75"
-            >
-              {groupByYear(quarters).map(({ year, quarters: qs }) => (
-                <optgroup key={year} label={`📅 ${year}`}>
-                  {qs.map((q) => (
-                    <option key={q.id} value={q.id}>
-                      {q.name}{q.isActive ? " ✅" : ""}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <span className="text-xs text-slate-400 flex-shrink-0">⏱️ Quarter:</span>
+            <YearQuarterPicker quarters={quarters} value={selectedQ} onChange={setSelectedQ} />
           </div>
         </div>
 

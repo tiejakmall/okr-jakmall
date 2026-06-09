@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { groupByYear } from "@/lib/quarter-group";
+import YearQuarterPicker from "@/components/YearQuarterPicker";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ReferenceLine,
@@ -221,7 +221,7 @@ function AssignmentSection({ a, index }: { a: AssignmentData; index: number }) {
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 type Props = {
-  quarters: { id: string; name: string; year: number; isActive: boolean }[];
+  quarters: { id: string; name: string; year: number; quarter: number; isActive: boolean }[];
   members: { id: string; name: string }[];
   leadId: string;
   defaultQuarterId?: string;
@@ -269,22 +269,7 @@ export default function IndividualView({ quarters, members, leadId, defaultQuart
         <div className="flex flex-wrap items-end gap-4">
           <div>
             <p className="text-xs text-slate-400 mb-1.5">⏱️ Quarter</p>
-            <select
-              value={selectedQ}
-              onChange={(e) => setSelectedQ(e.target.value)}
-              className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white
-                shadow-[0_2px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-px transition-all duration-75"
-            >
-              {groupByYear(quarters).map(({ year, quarters: qs }) => (
-                <optgroup key={year} label={`📅 ${year}`}>
-                  {qs.map((q) => (
-                    <option key={q.id} value={q.id}>
-                      {q.name}{q.isActive ? " ✅" : ""}
-                    </option>
-                  ))}
-                </optgroup>
-              ))}
-            </select>
+            <YearQuarterPicker quarters={quarters} value={selectedQ} onChange={setSelectedQ} />
           </div>
           <div>
             <p className="text-xs text-slate-400 mb-1.5">👤 Anggota</p>
