@@ -54,7 +54,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
       // Google sign-in: find or create user in our DB
       if (account?.provider === "google" && user?.email) {
-        const dbUser = await prisma.user.findUnique({ where: { email: user.email } });
+        const dbUser =
+          await prisma.user.findUnique({ where: { email: user.email } }) ??
+          await prisma.user.findUnique({ where: { googleEmail: user.email } });
         if (dbUser) {
           if (!dbUser.image && user.image) {
             await prisma.user.update({ where: { id: dbUser.id }, data: { image: user.image } });

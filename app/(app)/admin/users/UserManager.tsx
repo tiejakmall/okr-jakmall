@@ -11,6 +11,7 @@ type User = {
   division: string | null;
   isApproved: boolean;
   hasOnboarded: boolean;
+  googleEmail: string | null;
   createdAt: string;
 };
 type TeamMemberOption = {
@@ -149,6 +150,9 @@ export default function UserManager({ initialUsers, teamMembers }: { initialUser
   const [linkSelectValue, setLinkSelectValue] = useState("");
   const [linkSaving, setLinkSaving] = useState(false);
   const [approvingId, setApprovingId] = useState<string | null>(null);
+  const [googleLinkingId, setGoogleLinkingId] = useState<string | null>(null);
+  const [googleEmailInput, setGoogleEmailInput] = useState("");
+  const [googleSaving, setGoogleSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function cancel() { setShowForm(false); setEditId(null); setForm(emptyForm); }
@@ -167,6 +171,25 @@ export default function UserManager({ initialUsers, teamMembers }: { initialUser
       alert("Terjadi kesalahan jaringan.");
     } finally {
       setApprovingId(null);
+    }
+  }
+
+  async function saveGoogleLink(userId: string) {
+    setGoogleSaving(true);
+    try {
+      const res = await fetch(`/api/users/${userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ googleEmail: googleEmailInput }),
+      });
+      if (!res.ok) { alert("Gagal menyimpan."); return; }
+      setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, googleEmail: googleEmailInput || null } : u));
+      setGoogleLinkingId(null);
+      setGoogleEmailInput("");
+    } catch {
+      alert("Terjadi kesalahan jaringan.");
+    } finally {
+      setGoogleSaving(false);
     }
   }
 
@@ -423,6 +446,26 @@ export default function UserManager({ initialUsers, teamMembers }: { initialUser
                       )}
                     </td>
                     <td className="px-5 py-3 text-right">
+                      {/* Google link inline UI */}
+                      {googleLinkingId === user.id && (
+                        <div className="flex items-center gap-2 mb-2 justify-end">
+                          <input
+                            type="email"
+                            value={googleEmailInput}
+                            onChange={(e) => setGoogleEmailInput(e.target.value)}
+                            placeholder="email@gmail.com"
+                            className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 w-44"
+                          />
+                          <button
+                            onClick={() => saveGoogleLink(user.id)}
+                            disabled={googleSaving}
+                            className="text-xs font-semibold px-3 py-1 bg-amber-400 text-gray-900 rounded-lg shadow-[0_2px_0_#d97706] hover:shadow-[0_1px_0_#d97706] hover:translate-y-px transition-all disabled:opacity-50"
+                          >
+                            {googleSaving ? "⏳" : "💾"}
+                          </button>
+                          <button onClick={() => { setGoogleLinkingId(null); setGoogleEmailInput(""); }} className="text-xs text-slate-400 hover:text-slate-600">✕</button>
+                        </div>
+                      )}
                       <div className="flex items-center justify-end gap-1">
                         {user.role === "MEMBER" && (
                           <button
@@ -437,6 +480,19 @@ export default function UserManager({ initialUsers, teamMembers }: { initialUser
                             🔗
                           </button>
                         )}
+                        <button
+                          onClick={() => {
+                            setGoogleLinkingId(googleLinkingId === user.id ? null : user.id);
+                            setGoogleEmailInput(user.googleEmail ?? "");
+                          }}
+                          className={`text-xs p-1.5 rounded-lg border transition-all duration-75
+                            shadow-[0_2px_0_#e2e8f0] hover:shadow-[0_1px_0_#e2e8f0] hover:translate-y-px
+                            active:shadow-none active:translate-y-[2px]
+                            ${user.googleEmail ? "text-blue-600 border-blue-200 hover:bg-blue-50" : "text-slate-400 border-slate-200 hover:bg-slate-100 hover:text-slate-600"}`}
+                          title={user.googleEmail ? `Google: ${user.googleEmail}` : "Link Google email"}
+                        >
+                          G
+                        </button>
                         <button
                           onClick={() => startEdit(user)}
                           className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100

@@ -24,6 +24,7 @@ model User {
   email          String       @unique
   password       String?
   image          String?
+  googleEmail    String?      @unique
   role           Role         @default(MEMBER)
   division       String?
   hasOnboarded   Boolean      @default(true)
