@@ -6,6 +6,8 @@ import SessionProvider from "@/components/SessionProvider";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
   if (!session) redirect("/login");
+  if (!session.user.hasOnboarded) redirect("/onboarding");
+  if (!session.user.isApproved) redirect("/pending-approval");
 
   return (
     <SessionProvider>

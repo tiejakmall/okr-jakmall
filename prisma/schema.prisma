@@ -22,9 +22,12 @@ model User {
   id             String       @id @default(cuid())
   name           String
   email          String       @unique
-  password       String
+  password       String?
+  image          String?
   role           Role         @default(MEMBER)
   division       String?
+  hasOnboarded   Boolean      @default(true)
+  isApproved     Boolean      @default(true)
   objectives     Objective[]
   teamMembers    TeamMember[] @relation("LeadTeamMembers")
   teamMembership TeamMember?  @relation("MemberUserLink")

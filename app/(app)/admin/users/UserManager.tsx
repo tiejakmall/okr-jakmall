@@ -9,6 +9,8 @@ type User = {
   email: string;
   role: string;
   division: string | null;
+  isApproved: boolean;
+  hasOnboarded: boolean;
   createdAt: string;
 };
 type TeamMemberOption = {
@@ -146,9 +148,40 @@ export default function UserManager({ initialUsers, teamMembers }: { initialUser
   const [linkingUserId, setLinkingUserId] = useState<string | null>(null);
   const [linkSelectValue, setLinkSelectValue] = useState("");
   const [linkSaving, setLinkSaving] = useState(false);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function cancel() { setShowForm(false); setEditId(null); setForm(emptyForm); }
+
+  async function approveUser(id: string) {
+    setApprovingId(id);
+    try {
+      const res = await fetch(`/api/users/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isApproved: true }),
+      });
+      if (!res.ok) { alert("Gagal menyetujui pengguna."); return; }
+      setUsers((prev) => prev.map((u) => u.id === id ? { ...u, isApproved: true } : u));
+    } catch {
+      alert("Terjadi kesalahan jaringan.");
+    } finally {
+      setApprovingId(null);
+    }
+  }
+
+  async function rejectUser(id: string) {
+    setApprovingId(id);
+    try {
+      const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
+      if (!res.ok && res.status !== 204) { alert("Gagal menolak pengguna."); return; }
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+    } catch {
+      alert("Terjadi kesalahan jaringan.");
+    } finally {
+      setApprovingId(null);
+    }
+  }
 
   async function saveLink(userId: string) {
     setLinkSaving(true);
@@ -248,7 +281,10 @@ export default function UserManager({ initialUsers, teamMembers }: { initialUser
     setForm({ name: user.name, email: user.email, password: "", role: user.role, division: user.division ?? "", teamMemberId: linkedTm?.id ?? "" });
   }
 
-  const grouped = users.reduce<Record<string, User[]>>((acc, u) => {
+  const pendingUsers = users.filter((u) => !u.isApproved);
+  const activeUsers = users.filter((u) => u.isApproved);
+
+  const grouped = activeUsers.reduce<Record<string, User[]>>((acc, u) => {
     const key = u.division || "(Tanpa Divisi)";
     if (!acc[key]) acc[key] = [];
     acc[key].push(u);
@@ -289,6 +325,52 @@ export default function UserManager({ initialUsers, teamMembers }: { initialUser
 
       {showForm && <UserForm form={form} isEdit={false} onChange={setForm} onSave={createUser} onCancel={cancel} teamMembers={tms} />}
       {editId && <UserForm form={form} isEdit={true} onChange={setForm} onSave={updateUser} onCancel={cancel} teamMembers={tms} editUserId={editId} />}
+
+      {pendingUsers.length > 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden mb-5">
+          <div className="px-5 py-3 border-b border-amber-200 flex items-center gap-2">
+            <span className="text-base">⏳</span>
+            <span className="font-semibold text-amber-800 text-sm">Menunggu Persetujuan</span>
+            <span className="text-amber-600 text-xs bg-amber-200 px-2 py-0.5 rounded-full font-semibold">{pendingUsers.length}</span>
+          </div>
+          <table className="w-full text-sm">
+            <tbody>
+              {pendingUsers.map((user) => (
+                <tr key={user.id} className="border-b border-amber-100 last:border-0">
+                  <td className="px-5 py-3 font-medium text-slate-800">{user.name}</td>
+                  <td className="px-5 py-3 text-slate-500">{user.email}</td>
+                  <td className="px-5 py-3 text-slate-500">{user.division ?? "—"}</td>
+                  <td className="px-5 py-3">
+                    <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-amber-100 text-amber-700">⭐ Lead Divisi</span>
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => approveUser(user.id)}
+                        disabled={approvingId === user.id}
+                        className="text-xs font-bold px-3 py-1.5 bg-green-500 text-white rounded-lg
+                          shadow-[0_2px_0_#16a34a] hover:shadow-[0_1px_0_#16a34a] hover:translate-y-px
+                          active:shadow-none active:translate-y-[2px] transition-all disabled:opacity-50"
+                      >
+                        ✓ Setujui
+                      </button>
+                      <button
+                        onClick={() => { if (confirm(`Tolak dan hapus akun ${user.name}?`)) rejectUser(user.id); }}
+                        disabled={approvingId === user.id}
+                        className="text-xs font-bold px-3 py-1.5 bg-white border border-red-200 text-red-500 rounded-lg
+                          shadow-[0_2px_0_#fecaca] hover:shadow-[0_1px_0_#fecaca] hover:translate-y-px
+                          active:shadow-none active:translate-y-[2px] transition-all disabled:opacity-50"
+                      >
+                        ✕ Tolak
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div className="space-y-4">
         {Object.entries(grouped).map(([division, divUsers]) => (
@@ -380,7 +462,7 @@ export default function UserManager({ initialUsers, teamMembers }: { initialUser
           </div>
         ))}
 
-        {users.length === 0 && (
+        {activeUsers.length === 0 && (
           <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
             <div className="text-4xl mb-3">👥</div>
             <p className="text-slate-500 text-sm">Belum ada pengguna. Klik "Tambah Pengguna" untuk mulai.</p>
