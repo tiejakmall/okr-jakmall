@@ -36,6 +36,12 @@ model User {
   updatedAt      DateTime     @updatedAt
 }
 
+model Division {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
+
 model Quarter {
   id              String             @id @default(cuid())
   name            String

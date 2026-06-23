@@ -16,6 +16,7 @@ export default function OnboardingPage() {
   const [role, setRole] = useState("MEMBER");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [divisions, setDivisions] = useState<{ id: string; name: string }[]>([]);
 
   useEffect(() => {
     if (status === "unauthenticated") router.replace("/login");
@@ -24,6 +25,12 @@ export default function OnboardingPage() {
       setName(session.user.name ?? "");
     }
   }, [status, session, router]);
+
+  useEffect(() => {
+    fetch("/api/divisions").then((r) => r.json()).then((data) => {
+      if (Array.isArray(data)) setDivisions(data);
+    });
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -155,13 +162,20 @@ export default function OnboardingPage() {
                 {role === "LEAD" && <span className="text-red-400 ml-1">*</span>}
                 {role === "MEMBER" && <span className="text-slate-400 font-normal ml-1">(opsional)</span>}
               </label>
-              <input
+              <select
                 value={division}
                 onChange={(e) => setDivision(e.target.value)}
                 className={inputCls}
-                placeholder="cth: Finance, Marketing, HRD..."
                 required={role === "LEAD"}
-              />
+              >
+                <option value="">— Pilih divisi —</option>
+                {divisions.map((d) => (
+                  <option key={d.id} value={d.name}>{d.name}</option>
+                ))}
+              </select>
+              {divisions.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">Belum ada divisi tersedia. Hubungi admin.</p>
+              )}
             </div>
 
             {error && (

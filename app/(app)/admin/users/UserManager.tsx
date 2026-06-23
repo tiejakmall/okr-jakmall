@@ -14,6 +14,8 @@ type User = {
   googleEmail: string | null;
   createdAt: string;
 };
+type DivisionOption = { id: string; name: string };
+
 type TeamMemberOption = {
   id: string;
   name: string;
@@ -54,13 +56,14 @@ const btnSecondary =
 const inputCls =
   "w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white transition";
 
-function UserForm({ form, isEdit, onChange, onSave, onCancel, teamMembers, editUserId }: {
+function UserForm({ form, isEdit, onChange, onSave, onCancel, teamMembers, divisions, editUserId }: {
   form: FormState;
   isEdit: boolean;
   onChange: (f: FormState) => void;
   onSave: () => void;
   onCancel: () => void;
   teamMembers: TeamMemberOption[];
+  divisions: DivisionOption[];
   editUserId?: string;
 }) {
   // Available team members: unlinked, OR linked to this user being edited
@@ -104,7 +107,12 @@ function UserForm({ form, isEdit, onChange, onSave, onCancel, teamMembers, editU
               <span className="text-amber-600 ml-1 font-normal">— Lead & Member dengan nama divisi yang sama akan tergroup</span>
             )}
           </label>
-          <input className={inputCls} value={form.division} onChange={(e) => onChange({ ...form, division: e.target.value })} placeholder="contoh: Designer Brand, Content Creator, Visual Designer" />
+          <select className={inputCls} value={form.division} onChange={(e) => onChange({ ...form, division: e.target.value })}>
+            <option value="">— Pilih divisi —</option>
+            {divisions.map((d) => (
+              <option key={d.id} value={d.name}>{d.name}</option>
+            ))}
+          </select>
         </div>
         {form.role === "MEMBER" && (
           <div className="col-span-2">
@@ -138,7 +146,7 @@ function UserForm({ form, isEdit, onChange, onSave, onCancel, teamMembers, editU
   );
 }
 
-export default function UserManager({ initialUsers, teamMembers }: { initialUsers: User[]; teamMembers: TeamMemberOption[] }) {
+export default function UserManager({ initialUsers, teamMembers, divisions }: { initialUsers: User[]; teamMembers: TeamMemberOption[]; divisions: DivisionOption[] }) {
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [tms, setTms] = useState<TeamMemberOption[]>(teamMembers);
   const [showForm, setShowForm] = useState(false);
@@ -346,8 +354,8 @@ export default function UserManager({ initialUsers, teamMembers }: { initialUser
         </div>
       )}
 
-      {showForm && <UserForm form={form} isEdit={false} onChange={setForm} onSave={createUser} onCancel={cancel} teamMembers={tms} />}
-      {editId && <UserForm form={form} isEdit={true} onChange={setForm} onSave={updateUser} onCancel={cancel} teamMembers={tms} editUserId={editId} />}
+      {showForm && <UserForm form={form} isEdit={false} onChange={setForm} onSave={createUser} onCancel={cancel} teamMembers={tms} divisions={divisions} />}
+      {editId && <UserForm form={form} isEdit={true} onChange={setForm} onSave={updateUser} onCancel={cancel} teamMembers={tms} divisions={divisions} editUserId={editId} />}
 
       {pendingUsers.length > 0 && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl overflow-hidden mb-5">
