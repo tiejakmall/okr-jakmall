@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
@@ -45,11 +45,7 @@ export default function OnboardingPage() {
       }
       const data = await res.json();
       await update();
-      if (data.role === "LEAD") {
-        router.replace("/pending-approval");
-      } else {
-        router.replace("/dashboard");
-      }
+      window.location.href = data.role === "LEAD" ? "/pending-approval" : "/dashboard";
     } catch {
       setError("Terjadi kesalahan jaringan.");
       setSaving(false);
@@ -95,9 +91,18 @@ export default function OnboardingPage() {
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
           <div className="mb-7">
-            <div className="flex items-center gap-2 mb-5">
-              <span className="text-2xl">📈</span>
-              <span className="text-xl font-bold text-slate-900">OKR Tracker</span>
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl">📈</span>
+                <span className="text-xl font-bold text-slate-900">OKR Tracker</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => signOut({ callbackUrl: "/login" })}
+                className="text-xs text-slate-400 hover:text-slate-600 transition"
+              >
+                Keluar
+              </button>
             </div>
             <h1 className="text-2xl font-bold text-slate-900">Lengkapi Profil</h1>
             <p className="text-slate-500 text-sm mt-1">Siapa kamu di organisasi ini?</p>
