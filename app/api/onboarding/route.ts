@@ -6,7 +6,10 @@ export async function POST(req: NextRequest) {
   const session = await auth();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { name, division, role } = await req.json();
+  const { name, division: rawDivision, role } = await req.json();
+  const division = rawDivision?.trim()
+    ? rawDivision.trim().replace(/\b\w/g, (c: string) => c.toUpperCase())
+    : undefined;
 
   if (!name?.trim() || !role) {
     return NextResponse.json({ error: "Nama dan role wajib diisi" }, { status: 400 });
@@ -21,7 +24,7 @@ export async function POST(req: NextRequest) {
     where: { id: session.user.id },
     data: {
       name: name.trim(),
-      division: division?.trim() || null,
+      division: division || null,
       role,
       hasOnboarded: true,
       isApproved: !isLead,
