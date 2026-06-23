@@ -20,7 +20,7 @@ export default function PendingApprovalPage() {
           clearInterval(interval);
           setChecking(true);
           await update();
-          router.replace("/dashboard");
+          window.location.href = "/dashboard";
         }
       } catch {
         // network error, retry next tick
