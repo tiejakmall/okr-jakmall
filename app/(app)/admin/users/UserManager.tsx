@@ -2,6 +2,8 @@
 
 import { useState, useRef } from "react";
 import { Trash2, Edit2 } from "lucide-react";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmModal";
 
 type User = {
   id: string;
@@ -76,7 +78,7 @@ function UserForm({ form, isEdit, onChange, onSave, onCancel, teamMembers, divis
       <h2 className="font-semibold text-slate-800 mb-4">
         {isEdit ? "✏️ Edit Pengguna" : "➕ Pengguna Baru"}
       </h2>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-medium text-slate-500 mb-1.5">👤 Nama</label>
           <input className={inputCls} value={form.name} onChange={(e) => onChange({ ...form, name: e.target.value })} placeholder="Nama lengkap" />
@@ -147,6 +149,8 @@ function UserForm({ form, isEdit, onChange, onSave, onCancel, teamMembers, divis
 }
 
 export default function UserManager({ initialUsers, teamMembers, divisions }: { initialUsers: User[]; teamMembers: TeamMemberOption[]; divisions: DivisionOption[] }) {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [users, setUsers] = useState<User[]>(initialUsers);
   const [tms, setTms] = useState<TeamMemberOption[]>(teamMembers);
   const [showForm, setShowForm] = useState(false);
@@ -173,10 +177,11 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ isApproved: true }),
       });
-      if (!res.ok) { alert("Gagal menyetujui pengguna."); return; }
+      if (!res.ok) { toast.error("Gagal menyetujui pengguna."); return; }
       setUsers((prev) => prev.map((u) => u.id === id ? { ...u, isApproved: true } : u));
+      toast.success("Pengguna disetujui");
     } catch {
-      alert("Terjadi kesalahan jaringan.");
+      toast.error("Terjadi kesalahan jaringan.");
     } finally {
       setApprovingId(null);
     }
@@ -190,25 +195,28 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ googleEmail: googleEmailInput }),
       });
-      if (!res.ok) { alert("Gagal menyimpan."); return; }
+      if (!res.ok) { toast.error("Gagal menyimpan."); return; }
       setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, googleEmail: googleEmailInput || null } : u));
+      toast.success("Google email berhasil di-link");
       setGoogleLinkingId(null);
       setGoogleEmailInput("");
     } catch {
-      alert("Terjadi kesalahan jaringan.");
+      toast.error("Terjadi kesalahan jaringan.");
     } finally {
       setGoogleSaving(false);
     }
   }
 
-  async function rejectUser(id: string) {
+  async function rejectUser(id: string, name: string) {
+    const ok = await confirm({ title: `Tolak dan hapus akun ${name}?`, danger: true });
+    if (!ok) return;
     setApprovingId(id);
     try {
       const res = await fetch(`/api/users/${id}`, { method: "DELETE" });
-      if (!res.ok && res.status !== 204) { alert("Gagal menolak pengguna."); return; }
+      if (!res.ok && res.status !== 204) { toast.error("Gagal menolak pengguna."); return; }
       setUsers((prev) => prev.filter((u) => u.id !== id));
     } catch {
-      alert("Terjadi kesalahan jaringan.");
+      toast.error("Terjadi kesalahan jaringan.");
     } finally {
       setApprovingId(null);
     }
@@ -224,7 +232,7 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
       });
       if (!res.ok) {
         const err = await res.json();
-        alert("Gagal menyimpan link: " + (err.error ?? JSON.stringify(err)));
+        toast.error("Gagal menyimpan link: " + (err.error ?? JSON.stringify(err)));
         return;
       }
       setTms((prev) => prev.map((tm) => {
@@ -232,10 +240,11 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
         if (tm.id === linkSelectValue) return { ...tm, userId };
         return tm;
       }));
+      toast.success("Link berhasil disimpan");
       setLinkingUserId(null);
       setLinkSelectValue("");
     } catch {
-      alert("Terjadi kesalahan jaringan.");
+      toast.error("Terjadi kesalahan jaringan.");
     } finally {
       setLinkSaving(false);
     }
@@ -270,14 +279,15 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
   }
 
   async function createUser() {
-    if (!form.name || !form.email || !form.password) { alert("Nama, email, dan password wajib diisi."); return; }
+    if (!form.name || !form.email || !form.password) { toast.error("Nama, email, dan password wajib diisi."); return; }
     const res = await fetch("/api/users", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-    if (!res.ok) { alert((await res.json()).error ?? "Gagal membuat pengguna"); return; }
+    if (!res.ok) { toast.error((await res.json()).error ?? "Gagal membuat pengguna"); return; }
     const user = await res.json();
     setUsers((prev) => [...prev, user].sort((a, b) => a.name.localeCompare(b.name)));
     if (form.teamMemberId) {
       setTms((prev) => prev.map((tm) => tm.id === form.teamMemberId ? { ...tm, userId: user.id } : tm));
     }
+    toast.success("Pengguna berhasil ditambahkan");
     cancel();
   }
 
@@ -288,6 +298,7 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
     };
     if (form.password) payload.password = form.password;
     const res = await fetch(`/api/users/${editId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    if (!res.ok) { toast.error((await res.json()).error ?? "Gagal memperbarui pengguna"); return; }
     const updated = await res.json();
     setUsers((prev) => prev.map((u) => (u.id === editId ? updated : u)));
     // Update local teamMembers state: clear old link, set new link
@@ -296,11 +307,13 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
       if (tm.id === form.teamMemberId) return { ...tm, userId: editId };
       return tm;
     }));
+    toast.success("Pengguna berhasil diperbarui");
     cancel();
   }
 
   async function deleteUser(id: string) {
-    if (!confirm("Hapus pengguna ini? Semua OKR mereka akan terhapus.")) return;
+    const ok = await confirm({ title: "Hapus pengguna ini?", message: "Semua OKR mereka akan terhapus.", danger: true });
+    if (!ok) return;
     await fetch(`/api/users/${id}`, { method: "DELETE" });
     setUsers((prev) => prev.filter((u) => u.id !== id));
   }
@@ -364,7 +377,8 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
             <span className="font-semibold text-amber-800 text-sm">Menunggu Persetujuan</span>
             <span className="text-amber-600 text-xs bg-amber-200 px-2 py-0.5 rounded-full font-semibold">{pendingUsers.length}</span>
           </div>
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[500px]">
             <tbody>
               {pendingUsers.map((user) => (
                 <tr key={user.id} className="border-b border-amber-100 last:border-0">
@@ -386,7 +400,7 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
                         ✓ Setujui
                       </button>
                       <button
-                        onClick={() => { if (confirm(`Tolak dan hapus akun ${user.name}?`)) rejectUser(user.id); }}
+                        onClick={() => rejectUser(user.id, user.name)}
                         disabled={approvingId === user.id}
                         className="text-xs font-bold px-3 py-1.5 bg-white border border-red-200 text-red-500 rounded-lg
                           shadow-[0_2px_0_#fecaca] hover:shadow-[0_1px_0_#fecaca] hover:translate-y-px
@@ -400,6 +414,7 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -411,7 +426,8 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
               <span className="font-semibold text-slate-700 text-sm">{division}</span>
               <span className="text-slate-400 text-xs">({divUsers.length} orang)</span>
             </div>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[600px]">
               <tbody>
                 {divUsers.map((user) => (
                   <tr key={user.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50/50 transition">
@@ -431,7 +447,7 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
                       </div>
                       {/* Inline link UI */}
                       {user.role === "MEMBER" && linkingUserId === user.id && (
-                        <div className="flex items-center gap-2 mt-2">
+                        <div className="flex flex-wrap items-center gap-2 mt-2">
                           <select
                             value={linkSelectValue}
                             onChange={(e) => setLinkSelectValue(e.target.value)}
@@ -456,7 +472,7 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
                     <td className="px-5 py-3 text-right">
                       {/* Google link inline UI */}
                       {googleLinkingId === user.id && (
-                        <div className="flex items-center gap-2 mb-2 justify-end">
+                        <div className="flex flex-wrap items-center gap-2 mb-2 justify-end">
                           <input
                             type="email"
                             value={googleEmailInput}
@@ -523,6 +539,7 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         ))}
 

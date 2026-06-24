@@ -1,11 +1,15 @@
 "use client";
 
 import { useState } from "react";
-import { Trash2 } from "lucide-react";
+import { Trash2, Loader2 } from "lucide-react";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmModal";
 
 type Division = { id: string; name: string };
 
 export default function DivisionManager({ initialDivisions }: { initialDivisions: Division[] }) {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [divisions, setDivisions] = useState<Division[]>(initialDivisions);
   const [input, setInput] = useState("");
   const [saving, setSaving] = useState(false);
@@ -29,6 +33,7 @@ export default function DivisionManager({ initialDivisions }: { initialDivisions
       }
       const division = await res.json();
       setDivisions((prev) => [...prev, division].sort((a, b) => a.name.localeCompare(b.name)));
+      toast.success("Divisi berhasil ditambahkan");
       setInput("");
     } catch {
       setError("Terjadi kesalahan jaringan.");
@@ -38,9 +43,11 @@ export default function DivisionManager({ initialDivisions }: { initialDivisions
   }
 
   async function deleteDivision(id: string, name: string) {
-    if (!confirm(`Hapus divisi "${name}"? Ini tidak menghapus user yang sudah terdaftar.`)) return;
+    const ok = await confirm({ title: `Hapus divisi "${name}"?`, message: "Ini tidak menghapus user yang sudah terdaftar.", danger: true });
+    if (!ok) return;
     await fetch(`/api/divisions/${id}`, { method: "DELETE" });
     setDivisions((prev) => prev.filter((d) => d.id !== id));
+    toast.success("Divisi dihapus");
   }
 
   return (
@@ -53,7 +60,7 @@ export default function DivisionManager({ initialDivisions }: { initialDivisions
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="cth: Quality Management Center"
-            className="flex-1 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white transition"
+            className="flex-1 min-w-0 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white transition"
           />
           <button
             type="submit"
@@ -64,7 +71,7 @@ export default function DivisionManager({ initialDivisions }: { initialDivisions
               disabled:opacity-50 disabled:shadow-none disabled:translate-y-0
               transition-all duration-75"
           >
-            {saving ? "⏳" : "Tambah"}
+            {saving ? <Loader2 size={14} className="animate-spin" /> : "Tambah"}
           </button>
         </form>
         {error && <p className="text-red-500 text-xs mt-2">{error}</p>}

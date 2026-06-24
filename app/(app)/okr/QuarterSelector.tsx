@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, X } from "lucide-react";
 import YearQuarterPicker from "@/components/YearQuarterPicker";
+import { useToast } from "@/components/Toast";
 
 type Quarter = {
   id: string;
@@ -28,6 +29,7 @@ export default function QuarterSelector({
   isLead: boolean;
   basePath?: string;
 }) {
+  const toast = useToast();
   const [showCreate, setShowCreate] = useState(false);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
@@ -49,7 +51,7 @@ export default function QuarterSelector({
       });
       if (!res.ok) {
         const err = await res.json();
-        alert(err.error ?? "Gagal membuat quarter");
+        toast.error(err.error ?? "Gagal membuat quarter");
         return;
       }
       const q = await res.json();
@@ -110,7 +112,7 @@ export default function QuarterSelector({
       {showCreate && (
         <div className="mt-4 pt-4 border-t border-slate-100">
           <p className="text-xs font-semibold text-slate-500 mb-3">📋 Quarter Baru</p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="col-span-2">
               <label className="block text-xs text-slate-400 mb-1">Nama Quarter</label>
               <input

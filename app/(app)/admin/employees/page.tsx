@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import EmployeeManager from "./EmployeeManager";
+
+export const metadata: Metadata = { title: "Karyawan" };
 
 export default async function EmployeesPage() {
   const session = await auth();

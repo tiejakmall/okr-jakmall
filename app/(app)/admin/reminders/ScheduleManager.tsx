@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import YearQuarterPicker from "@/components/YearQuarterPicker";
+import { useConfirm } from "@/components/ConfirmModal";
 
 type Quarter = { id: string; name: string; year: number; quarter: number; isActive: boolean };
 type Schedule = {
@@ -34,6 +35,7 @@ function scheduleDesc(s: Schedule) {
 }
 
 export default function ScheduleManager({ quarters, initialSchedules }: { quarters: Quarter[]; initialSchedules: Schedule[] }) {
+  const confirm = useConfirm();
   const [schedules, setSchedules] = useState<Schedule[]>(initialSchedules);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -84,7 +86,8 @@ export default function ScheduleManager({ quarters, initialSchedules }: { quarte
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Hapus jadwal ini?")) return;
+    const ok = await confirm({ title: "Hapus jadwal ini?", danger: true });
+    if (!ok) return;
     const res = await fetch(`/api/admin/reminder-schedules/${id}`, { method: "DELETE" });
     if (res.ok) setSchedules((prev) => prev.filter((s) => s.id !== id));
   }
@@ -94,7 +97,7 @@ export default function ScheduleManager({ quarters, initialSchedules }: { quarte
       {/* Create form */}
       <div className="bg-white rounded-2xl border border-slate-200 p-5">
         <h3 className="font-bold text-slate-800 mb-4">➕ Buat Jadwal Otomatis</h3>
-        <form onSubmit={handleCreate} className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
+        <form onSubmit={handleCreate} className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {/* Type */}
           <div className="space-y-1">
             <label className="text-xs font-semibold text-slate-500">Tipe Reminder</label>
@@ -153,7 +156,7 @@ export default function ScheduleManager({ quarters, initialSchedules }: { quarte
           </div>
 
           {/* Submit */}
-          <div className="flex items-end col-span-2 md:col-span-1">
+          <div className="flex items-end sm:col-span-2 md:col-span-1">
             <button type="submit" disabled={saving || !quarterId}
               className="w-full flex items-center justify-center gap-2 bg-amber-400 text-gray-900 font-bold text-sm px-5 py-2 rounded-xl
                 shadow-[0_4px_0_#d97706] hover:shadow-[0_2px_0_#d97706] hover:translate-y-0.5

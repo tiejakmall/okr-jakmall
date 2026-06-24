@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import DivisionManager from "./DivisionManager";
+
+export const metadata: Metadata = { title: "Divisi" };
 
 export default async function DivisionsPage() {
   const session = await auth();

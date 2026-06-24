@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+
+export const metadata: Metadata = { title: "Dashboard" };
 import DivisionView from "./DivisionView";
 import IndividualView from "./IndividualView";
 import MemberDashboard from "./MemberDashboard";

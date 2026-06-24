@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { after } from "next/server";
 import { auth } from "@/auth";
+
+export const metadata: Metadata = { title: "Reminder" };
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getSettingsIssues, getCollectionIssues } from "@/lib/reminder-issues";

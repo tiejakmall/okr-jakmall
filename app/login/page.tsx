@@ -55,7 +55,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right panel */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12">
+      <div className="flex-1 flex items-center justify-center px-4 sm:px-6 py-8 sm:py-12">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
           <div className="flex items-center gap-2 mb-8 lg:hidden">
@@ -100,6 +100,9 @@ export default function LoginPage() {
                 type="email"
                 required
                 placeholder="nama@perusahaan.com"
+                autoComplete="email"
+                autoCapitalize="none"
+                autoCorrect="off"
                 className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition"
               />
             </div>
@@ -112,6 +115,9 @@ export default function LoginPage() {
                 type="password"
                 required
                 placeholder="••••••••"
+                autoComplete="current-password"
+                autoCapitalize="none"
+                autoCorrect="off"
                 className="w-full border border-slate-200 rounded-xl px-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 bg-white focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent transition"
               />
             </div>

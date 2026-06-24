@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
+
+export const metadata: Metadata = { title: "Distribusi Anggota" };
 import { prisma } from "@/lib/prisma";
 import DistribusiAnggota from "../okr/DistribusiAnggota";
 import QuarterSelector from "../okr/QuarterSelector";

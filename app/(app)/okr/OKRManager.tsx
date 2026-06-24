@@ -4,6 +4,8 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Trash2, ChevronDown, ChevronUp, CheckSquare, Square, X, Key } from "lucide-react";
 import { calcObjectiveAchievement, calcKRAchievement } from "@/lib/calculations";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmModal";
 
 type KeyResult = {
   id: string;
@@ -120,6 +122,7 @@ function ImportModal({
   onImport: (newObjs: Objective[]) => void;
   onClose: () => void;
 }) {
+  const toast = useToast();
   const otherQuarters = allQuarters.filter((q) => q.id !== currentQuarterId);
   const [sourceId, setSourceId] = useState(otherQuarters[0]?.id ?? "");
   const [sourceObjs, setSourceObjs] = useState<Objective[]>([]);
@@ -206,7 +209,7 @@ function ImportModal({
       body: JSON.stringify({ fromQuarterId: sourceId, toQuarterId: currentQuarterId, selections }),
     });
     if (res.ok) { onImport(await res.json()); onClose(); }
-    else { alert((await res.json()).error ?? "Gagal mengimpor OKR"); }
+    else { toast.error((await res.json()).error ?? "Gagal mengimpor OKR"); }
     setImporting(false);
   }
 
@@ -321,6 +324,8 @@ function ImportModal({
 
 export default function OKRManager({ initialObjectives, quarterId, userId, allQuarters, isLead }: Props) {
   const router = useRouter();
+  const toast = useToast();
+  const confirm = useConfirm();
   const [objectives, setObjectives] = useState<Objective[]>(initialObjectives);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
@@ -361,7 +366,8 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
 
   async function bulkDelete() {
     if (selectedIds.size === 0) return;
-    if (!confirm(`Hapus ${selectedIds.size} objective beserta semua key result-nya?`)) return;
+    const ok = await confirm({ title: `Hapus ${selectedIds.size} objective?`, message: "Semua key result-nya juga akan terhapus permanen.", danger: true });
+    if (!ok) return;
     setBulkDeleting(true);
     await Promise.all(
       [...selectedIds].map((id) => fetch(`/api/objectives/${id}`, { method: "DELETE" }))
@@ -401,16 +407,18 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
   }
 
   async function deleteObjective(id: string) {
-    if (!confirm("Hapus objective ini beserta semua key result-nya?")) return;
+    const ok = await confirm({ title: "Hapus objective ini?", message: "Semua key result-nya juga akan terhapus permanen.", danger: true });
+    if (!ok) return;
     const res = await fetch(`/api/objectives/${id}`, { method: "DELETE" });
-    if (!res.ok) { alert((await res.json()).error); return; }
+    if (!res.ok) { toast.error((await res.json()).error); return; }
     setObjectives((prev) => prev.filter((o) => o.id !== id));
     router.refresh();
   }
 
   async function submitAllOKR() {
-    if (!weightOk) { alert("Total bobot objective harus 100% sebelum dikumpulkan."); return; }
-    if (!confirm("Cek kembali OKR yang sudah diisi di bawah ini sebelum mengumpulkan.\n\nSetelah dikumpulkan, OKR masih bisa diubah dengan kembali ke status Draft.\n\nLanjutkan kumpulkan OKR?")) return;
+    if (!weightOk) { toast.error("Total bobot objective harus 100% sebelum dikumpulkan."); return; }
+    const ok = await confirm({ title: "Kumpulkan semua OKR?", message: "Setelah dikumpulkan, OKR masih bisa ditarik kembali ke Draft jika perlu diubah.", confirmLabel: "Kumpulkan" });
+    if (!ok) return;
     setSaving(true);
     for (const obj of objectives.filter((o) => o.status === "DRAFT")) {
       await fetch(`/api/objectives/${obj.id}`, {
@@ -425,7 +433,8 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
   }
 
   async function recallOKR(id: string) {
-    if (!confirm("Tarik kembali OKR ini ke draft?")) return;
+    const ok = await confirm({ title: "Tarik kembali ke draft?", message: "OKR ini akan berubah ke status Draft dan bisa diedit kembali." });
+    if (!ok) return;
     await fetch(`/api/objectives/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -473,7 +482,8 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
   }
 
   async function deleteKR(objectiveId: string, krId: string) {
-    if (!confirm("Hapus key result ini?")) return;
+    const ok = await confirm({ title: "Hapus key result ini?", danger: true });
+    if (!ok) return;
     await fetch(`/api/key-results/${krId}`, { method: "DELETE" });
     setObjectives((prev) => prev.map((o) => o.id === objectiveId ? { ...o, keyResults: o.keyResults.filter((kr) => kr.id !== krId) } : o));
   }
@@ -636,7 +646,7 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
                 </span>
 
                 <textarea
-                  className="flex-1 font-semibold text-slate-800 text-sm border-b border-transparent hover:border-slate-200 focus:border-amber-400 focus:outline-none bg-transparent py-0.5 disabled:cursor-default disabled:text-slate-600 resize-none overflow-hidden leading-snug"
+                  className="flex-1 min-w-0 font-semibold text-slate-800 text-sm border-b border-transparent hover:border-slate-200 focus:border-amber-400 focus:outline-none bg-transparent py-0.5 disabled:cursor-default disabled:text-slate-600 resize-none overflow-hidden leading-snug"
                   rows={1}
                   value={obj.title}
                   disabled={isLocked}
@@ -754,7 +764,7 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
                             )}
                           </div>
 
-                          <div className="grid grid-cols-3 gap-3 text-xs mb-3">
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs mb-3">
                             <div>
                               <label className="block text-slate-400 mb-1 font-medium">🎯 Target</label>
                               <input

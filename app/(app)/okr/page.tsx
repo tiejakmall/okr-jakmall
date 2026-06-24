@@ -1,5 +1,8 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+
+export const metadata: Metadata = { title: "OKR" };
 import OKRManager from "./OKRManager";
 import ImportExportSection from "./ImportExportSection";
 import QuarterSelector from "./QuarterSelector";

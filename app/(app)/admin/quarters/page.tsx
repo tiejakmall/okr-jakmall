@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import QuarterManager from "./QuarterManager";
+
+export const metadata: Metadata = { title: "Quarter" };
 
 export default async function QuartersPage() {
   const session = await auth();

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Trash2, ChevronDown } from "lucide-react";
 import { groupByYear } from "@/lib/quarter-group";
 import YearQuarterPicker from "@/components/YearQuarterPicker";
+import { useConfirm } from "@/components/ConfirmModal";
 
 type Quarter = {
   id: string;
@@ -30,6 +31,7 @@ const inputCls =
   "w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent bg-white transition";
 
 export default function QuarterManager({ initialQuarters }: { initialQuarters: Quarter[] }) {
+  const confirm = useConfirm();
   const router = useRouter();
   const [quarters, setQuarters] = useState<Quarter[]>(initialQuarters);
   const [showForm, setShowForm] = useState(false);
@@ -82,7 +84,8 @@ export default function QuarterManager({ initialQuarters }: { initialQuarters: Q
   }
 
   async function deleteQuarter(id: string) {
-    if (!confirm("Hapus quarter ini? Semua OKR dalam quarter ini akan terhapus permanen.")) return;
+    const ok = await confirm({ title: "Hapus quarter ini?", message: "Semua OKR dalam quarter ini akan terhapus permanen.", danger: true });
+    if (!ok) return;
     await fetch(`/api/quarters/${id}`, { method: "DELETE" });
     setQuarters((prev) => prev.filter((q) => q.id !== id));
   }
@@ -115,7 +118,7 @@ export default function QuarterManager({ initialQuarters }: { initialQuarters: Q
       {showForm && (
         <div className="bg-white rounded-2xl border border-amber-200 p-6">
           <h2 className="font-semibold text-slate-800 mb-4">⏱️ Quarter Baru</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className="block text-xs font-medium text-slate-500 mb-1.5">Nama Quarter</label>
               <input className={inputCls} placeholder="contoh: Q1 2025" value={form.name}
@@ -215,9 +218,9 @@ export default function QuarterManager({ initialQuarters }: { initialQuarters: Q
                     {qs.map((q) => (
                       <div
                         key={q.id}
-                        className={`flex items-center justify-between px-5 py-4 ${q.isActive ? "bg-amber-50/50" : ""}`}
+                        className={`flex items-center justify-between gap-3 px-5 py-4 ${q.isActive ? "bg-amber-50/50" : ""}`}
                       >
-                        <div>
+                        <div className="min-w-0">
                           <div className="flex items-center gap-2.5 mb-0.5">
                             <h3 className="font-semibold text-slate-800 text-sm">⏱️ {q.name}</h3>
                             {q.isActive && (
@@ -231,7 +234,7 @@ export default function QuarterManager({ initialQuarters }: { initialQuarters: Q
                             {new Date(q.endDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           <button
                             onClick={() => toggleActive(q)}
                             className={`flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-xl font-semibold transition-all duration-75 ${

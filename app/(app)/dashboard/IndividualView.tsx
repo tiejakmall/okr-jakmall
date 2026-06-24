@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import YearQuarterPicker from "@/components/YearQuarterPicker";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -317,7 +317,7 @@ export default function IndividualView({ quarters, members, leadId, defaultQuart
 
       {loading && (
         <div className="flex items-center justify-center py-16 text-slate-400">
-          <span className="text-2xl animate-spin mr-3">⏳</span> Memuat data...
+          <Loader2 size={20} className="animate-spin mr-2 text-slate-400" /> Memuat data...
         </div>
       )}
 

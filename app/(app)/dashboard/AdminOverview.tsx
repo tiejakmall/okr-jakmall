@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 import DashboardTabs from "./DashboardTabs";
 import YearQuarterPicker from "@/components/YearQuarterPicker";
 
@@ -118,7 +118,7 @@ export default function AdminOverview({ leads, quarters, allMembersByLead }: Pro
 
         {loading && (
           <div className="py-12 text-center text-slate-400 text-sm">
-            <span className="animate-spin mr-2 text-lg inline-block">⏳</span> Memuat data...
+            <Loader2 size={18} className="animate-spin mr-2 text-slate-400 inline" /> Memuat data...
           </div>
         )}
 

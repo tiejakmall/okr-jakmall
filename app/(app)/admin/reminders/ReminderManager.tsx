@@ -180,7 +180,8 @@ export default function ReminderManager({
         {leads.length === 0 ? (
           <div className="p-8 text-center text-slate-400 text-sm">Belum ada Lead Divisi terdaftar.</div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[560px]">
             <thead>
               <tr className="border-b border-slate-100 text-xs text-slate-400">
                 <th className="text-left px-5 py-2.5 font-semibold">Nama</th>
@@ -202,6 +203,7 @@ export default function ReminderManager({
               ))}
             </tbody>
           </table>
+          </div>
         )}
       </div>
     </div>

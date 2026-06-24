@@ -1,7 +1,10 @@
+import type { Metadata } from "next";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import UserManager from "./UserManager";
+
+export const metadata: Metadata = { title: "Pengguna" };
 
 export default async function UsersPage() {
   const session = await auth();

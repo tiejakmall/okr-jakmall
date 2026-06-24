@@ -2,6 +2,7 @@
 
 import { useRef, useState, useEffect } from "react";
 import { Trash2, ChevronDown, ChevronUp, X, CheckSquare, Square } from "lucide-react";
+import { useConfirm } from "@/components/ConfirmModal";
 
 type KRAssignment = {
   id: string;
@@ -826,7 +827,7 @@ function CopyFromQuarterModal({
           ) : (
             <>
               {/* Source + Destination */}
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1.5">📤 Salin dari</label>
                   <select value={sourceId} onChange={(e) => { setDestId(""); loadPreview(e.target.value); }}
@@ -1038,6 +1039,7 @@ function ProgressExcel({ leadId, quarterId }: { leadId: string; quarterId: strin
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function DistribusiAnggota({ initialMembers, objectives, leadId, quarterId, allQuarters, leadDivision }: Props) {
+  const confirm = useConfirm();
   const [members, setMembers] = useState<Member[]>(initialMembers);
   const [newName, setNewName] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -1082,7 +1084,8 @@ export default function DistribusiAnggota({ initialMembers, objectives, leadId, 
   }
 
   async function deleteMember(id: string) {
-    if (!confirm("Hapus anggota ini dari quarter ini? Assignment di quarter lain tidak terpengaruh.")) return;
+    const ok = await confirm({ title: "Hapus anggota ini?", message: "Assignment di quarter lain tidak terpengaruh.", danger: true });
+    if (!ok) return;
     const res = await fetch(`/api/team-members/${id}?quarterId=${encodeURIComponent(quarterId)}`, { method: "DELETE" });
     if (res.ok) setMembers((prev) => prev.filter((m) => m.id !== id));
   }

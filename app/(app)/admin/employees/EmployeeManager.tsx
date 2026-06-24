@@ -1,7 +1,9 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Trash2, Edit2, ToggleLeft, ToggleRight } from "lucide-react";
+import { useToast } from "@/components/Toast";
+import { useConfirm } from "@/components/ConfirmModal";
 
 type Employee = {
   id: string;
@@ -19,21 +21,27 @@ const inputCls = "w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm 
 const btnPrimary = "flex items-center gap-2 bg-amber-400 text-gray-900 font-bold text-sm px-5 py-2.5 rounded-xl shadow-[0_4px_0_#d97706] hover:shadow-[0_2px_0_#d97706] hover:translate-y-0.5 active:shadow-[0_1px_0_#d97706] active:translate-y-[3px] transition-all duration-75";
 const btnSecondary = "flex items-center gap-2 bg-white border border-slate-200 text-slate-700 font-semibold text-sm px-5 py-2.5 rounded-xl shadow-[0_4px_0_#e2e8f0] hover:shadow-[0_2px_0_#e2e8f0] hover:translate-y-0.5 active:shadow-[0_1px_0_#e2e8f0] active:translate-y-[3px] transition-all duration-75";
 
-function EmployeeForm({ form, isEdit, onChange, onSave, onCancel }: {
+function EmployeeForm({ form, isEdit, onChange, onSave, onCancel, divisions }: {
   form: FormState; isEdit: boolean;
   onChange: (f: FormState) => void; onSave: () => void; onCancel: () => void;
+  divisions: { id: string; name: string }[];
 }) {
   return (
     <div className="bg-white rounded-2xl border border-amber-200 p-6 mb-5">
       <h2 className="font-semibold text-slate-800 mb-4">{isEdit ? "✏️ Edit Karyawan" : "➕ Karyawan Baru"}</h2>
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-medium text-slate-500 mb-1.5">👤 Nama*</label>
           <input className={inputCls} value={form.name} onChange={(e) => onChange({ ...form, name: e.target.value })} placeholder="Nama lengkap" />
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-500 mb-1.5">🏢 Divisi</label>
-          <input className={inputCls} value={form.division} onChange={(e) => onChange({ ...form, division: e.target.value })} placeholder="contoh: HR, Marketing, Finance" />
+          <select className={inputCls} value={form.division} onChange={(e) => onChange({ ...form, division: e.target.value })}>
+            <option value="">— Pilih divisi —</option>
+            {divisions.map((d) => (
+              <option key={d.id} value={d.name}>{d.name}</option>
+            ))}
+          </select>
         </div>
         <div>
           <label className="block text-xs font-medium text-slate-500 mb-1.5">💼 Jabatan / Posisi</label>
@@ -56,7 +64,10 @@ function EmployeeForm({ form, isEdit, onChange, onSave, onCancel }: {
 }
 
 export default function EmployeeManager({ initialEmployees }: { initialEmployees: Employee[] }) {
+  const toast = useToast();
+  const confirm = useConfirm();
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
+  const [divisions, setDivisions] = useState<{ id: string; name: string }[]>([]);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(emptyForm);
@@ -67,14 +78,21 @@ export default function EmployeeManager({ initialEmployees }: { initialEmployees
   const [filter, setFilter] = useState<"all" | "active" | "inactive">("all");
   const [search, setSearch] = useState("");
 
+  useEffect(() => {
+    fetch("/api/divisions").then((r) => r.json()).then((data) => {
+      if (Array.isArray(data)) setDivisions(data);
+    }).catch(() => {});
+  }, []);
+
   function cancel() { setShowForm(false); setEditId(null); setForm(emptyForm); }
 
   async function createEmployee() {
-    if (!form.name.trim()) { alert("Nama wajib diisi."); return; }
+    if (!form.name.trim()) { toast.error("Nama wajib diisi."); return; }
     const res = await fetch("/api/employees", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-    if (!res.ok) { alert((await res.json()).error ?? "Gagal membuat karyawan"); return; }
+    if (!res.ok) { toast.error((await res.json()).error ?? "Gagal membuat karyawan"); return; }
     const emp = await res.json();
     setEmployees((prev) => [...prev, emp].sort((a, b) => (a.division ?? "").localeCompare(b.division ?? "") || a.name.localeCompare(b.name)));
+    toast.success("Karyawan berhasil ditambahkan");
     cancel();
   }
 
@@ -87,7 +105,8 @@ export default function EmployeeManager({ initialEmployees }: { initialEmployees
   }
 
   async function deleteEmployee(id: string) {
-    if (!confirm("Hapus karyawan ini dari daftar?")) return;
+    const ok = await confirm({ title: "Hapus karyawan ini dari daftar?", danger: true });
+    if (!ok) return;
     await fetch(`/api/employees/${id}`, { method: "DELETE" });
     setEmployees((prev) => prev.filter((e) => e.id !== id));
   }
@@ -187,8 +206,8 @@ export default function EmployeeManager({ initialEmployees }: { initialEmployees
         </div>
       )}
 
-      {showForm && <EmployeeForm form={form} isEdit={false} onChange={setForm} onSave={createEmployee} onCancel={cancel} />}
-      {editId && <EmployeeForm form={form} isEdit={true} onChange={setForm} onSave={updateEmployee} onCancel={cancel} />}
+      {showForm && <EmployeeForm form={form} isEdit={false} onChange={setForm} onSave={createEmployee} onCancel={cancel} divisions={divisions} />}
+      {editId && <EmployeeForm form={form} isEdit={true} onChange={setForm} onSave={updateEmployee} onCancel={cancel} divisions={divisions} />}
 
       {/* Employee list grouped by division */}
       <div className="space-y-4">
@@ -199,7 +218,8 @@ export default function EmployeeManager({ initialEmployees }: { initialEmployees
               <span className="font-semibold text-slate-700 text-sm">{division}</span>
               <span className="text-slate-400 text-xs">({emps.length} karyawan)</span>
             </div>
-            <table className="w-full text-sm">
+            <div className="overflow-x-auto">
+            <table className="w-full text-sm min-w-[500px]">
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-400">Nama</th>
@@ -238,6 +258,7 @@ export default function EmployeeManager({ initialEmployees }: { initialEmployees
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         ))}
 
