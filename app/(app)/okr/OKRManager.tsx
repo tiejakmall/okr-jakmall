@@ -620,78 +620,123 @@ export default function OKRManager({ initialObjectives, quarterId, userId, allQu
               }`}
             >
               {/* Objective header */}
-              <div className="flex items-start gap-3 px-4 py-3.5">
-                {/* Checkbox in select mode (only for DRAFT) */}
-                {selectMode && isDraft && (
-                  <button
-                    onClick={() => toggleSelect(obj.id)}
-                    className="flex-shrink-0 text-slate-400 hover:text-amber-500 transition"
-                  >
-                    {isSelected
-                      ? <CheckSquare size={17} className="text-red-500" />
-                      : <Square size={17} />
-                    }
-                  </button>
-                )}
-
-                <button
-                  onClick={() => setExpanded((p) => ({ ...p, [obj.id]: !p[obj.id] }))}
-                  className="text-slate-400 hover:text-slate-600 transition flex-shrink-0 mt-0.5"
-                >
-                  {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                </button>
-
-                <span className="w-6 h-6 rounded-full bg-amber-400 text-gray-900 text-xs font-bold flex items-center justify-center flex-shrink-0 shadow-[0_2px_0_#d97706] mt-0.5">
-                  {objIdx + 1}
-                </span>
-
-                <textarea
-                  className="flex-1 min-w-0 font-semibold text-slate-800 text-sm border-b border-transparent hover:border-slate-200 focus:border-amber-400 focus:outline-none bg-transparent py-0.5 disabled:cursor-default disabled:text-slate-600 resize-none overflow-hidden leading-snug"
-                  rows={1}
-                  value={obj.title}
-                  disabled={isLocked}
-                  ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
-                  onChange={(e) => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; updateObjective(obj.id, { title: e.target.value }); }}
-                  onBlur={() => !isLocked && saveObjective(obj)}
-                />
-
-                <div className="flex items-center gap-1.5 flex-shrink-0 mt-0.5">
-                  <span className="text-xs text-slate-400">Bobot</span>
-                  <input
-                    type="number"
-                    className="w-14 text-right border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-amber-400 disabled:bg-slate-50 disabled:cursor-default"
-                    value={obj.weight}
-                    disabled={isLocked}
-                    onChange={(e) => updateObjective(obj.id, { weight: Number(e.target.value) })}
-                    onBlur={() => !isLocked && saveObjective(obj)}
-                    min={0} max={100}
-                  />
-                  <span className="text-xs text-slate-400">%</span>
-                </div>
-
-                <span className={`text-xs font-bold px-2.5 py-1 rounded-lg flex-shrink-0 mt-0.5 ${
-                  achievement >= 100 ? "bg-green-100 text-green-700"
-                  : achievement >= 70 ? "bg-amber-100 text-amber-700"
-                  : "bg-red-100 text-red-600"
-                }`}>
-                  {achievement >= 100 ? "🏆" : achievement >= 70 ? "🔥" : "📉"} {achievement.toFixed(0)}%
-                </span>
-
-                {isLocked ? (
-                  <button
-                    onClick={() => recallOKR(obj.id)}
-                    className="text-slate-400 hover:text-orange-500 transition flex-shrink-0 text-base mt-0.5"
-                    title="Tarik kembali ke draft"
-                  >
-                    🔄
-                  </button>
-                ) : (
-                  !selectMode && (
-                    <button onClick={() => deleteObjective(obj.id)} className={`${btnDanger} flex-shrink-0 mt-0.5`}>
-                      <Trash2 size={15} />
+              <div className="px-4 py-3.5">
+                <div className="flex items-start gap-2.5">
+                  {/* Checkbox in select mode (only for DRAFT) */}
+                  {selectMode && isDraft && (
+                    <button
+                      onClick={() => toggleSelect(obj.id)}
+                      className="flex-shrink-0 text-slate-400 hover:text-amber-500 transition mt-0.5"
+                    >
+                      {isSelected
+                        ? <CheckSquare size={17} className="text-red-500" />
+                        : <Square size={17} />
+                      }
                     </button>
-                  )
-                )}
+                  )}
+
+                  <button
+                    onClick={() => setExpanded((p) => ({ ...p, [obj.id]: !p[obj.id] }))}
+                    className="text-slate-400 hover:text-slate-600 transition flex-shrink-0 mt-0.5"
+                  >
+                    {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  </button>
+
+                  <span className="w-6 h-6 rounded-full bg-amber-400 text-gray-900 text-xs font-bold flex items-center justify-center flex-shrink-0 shadow-[0_2px_0_#d97706] mt-0.5">
+                    {objIdx + 1}
+                  </span>
+
+                  {/* Title + mobile controls below */}
+                  <div className="flex-1 min-w-0">
+                    <textarea
+                      className="w-full font-semibold text-slate-800 text-sm border-b border-transparent hover:border-slate-200 focus:border-amber-400 focus:outline-none bg-transparent py-0.5 disabled:cursor-default disabled:text-slate-600 resize-none overflow-hidden leading-snug"
+                      rows={1}
+                      value={obj.title}
+                      disabled={isLocked}
+                      ref={(el) => { if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
+                      onChange={(e) => { e.target.style.height = "auto"; e.target.style.height = e.target.scrollHeight + "px"; updateObjective(obj.id, { title: e.target.value }); }}
+                      onBlur={() => !isLocked && saveObjective(obj)}
+                    />
+
+                    {/* Mobile-only controls row */}
+                    <div className="flex items-center gap-2 mt-1.5 lg:hidden flex-wrap">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-slate-400">Bobot</span>
+                        <input
+                          type="number"
+                          className="w-14 text-right border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-amber-400 disabled:bg-slate-50 disabled:cursor-default"
+                          value={obj.weight}
+                          disabled={isLocked}
+                          onChange={(e) => updateObjective(obj.id, { weight: Number(e.target.value) })}
+                          onBlur={() => !isLocked && saveObjective(obj)}
+                          min={0} max={100}
+                        />
+                        <span className="text-xs text-slate-400">%</span>
+                      </div>
+                      <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
+                        achievement >= 100 ? "bg-green-100 text-green-700"
+                        : achievement >= 70 ? "bg-amber-100 text-amber-700"
+                        : "bg-red-100 text-red-600"
+                      }`}>
+                        {achievement >= 100 ? "🏆" : achievement >= 70 ? "🔥" : "📉"} {achievement.toFixed(0)}%
+                      </span>
+                      {isLocked ? (
+                        <button
+                          onClick={() => recallOKR(obj.id)}
+                          className="text-slate-400 hover:text-orange-500 transition text-base"
+                          title="Tarik kembali ke draft"
+                        >
+                          🔄
+                        </button>
+                      ) : (
+                        !selectMode && (
+                          <button onClick={() => deleteObjective(obj.id)} className={btnDanger}>
+                            <Trash2 size={15} />
+                          </button>
+                        )
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Desktop-only controls */}
+                  <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-slate-400">Bobot</span>
+                      <input
+                        type="number"
+                        className="w-14 text-right border border-slate-200 rounded-lg px-2 py-1 text-sm focus:outline-none focus:border-amber-400 disabled:bg-slate-50 disabled:cursor-default"
+                        value={obj.weight}
+                        disabled={isLocked}
+                        onChange={(e) => updateObjective(obj.id, { weight: Number(e.target.value) })}
+                        onBlur={() => !isLocked && saveObjective(obj)}
+                        min={0} max={100}
+                      />
+                      <span className="text-xs text-slate-400">%</span>
+                    </div>
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-lg ${
+                      achievement >= 100 ? "bg-green-100 text-green-700"
+                      : achievement >= 70 ? "bg-amber-100 text-amber-700"
+                      : "bg-red-100 text-red-600"
+                    }`}>
+                      {achievement >= 100 ? "🏆" : achievement >= 70 ? "🔥" : "📉"} {achievement.toFixed(0)}%
+                    </span>
+                    {isLocked ? (
+                      <button
+                        onClick={() => recallOKR(obj.id)}
+                        className="text-slate-400 hover:text-orange-500 transition text-base"
+                        title="Tarik kembali ke draft"
+                      >
+                        🔄
+                      </button>
+                    ) : (
+                      !selectMode && (
+                        <button onClick={() => deleteObjective(obj.id)} className={btnDanger}>
+                          <Trash2 size={15} />
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Progress bar */}

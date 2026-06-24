@@ -165,7 +165,7 @@ function AssignmentSection({ a, index }: { a: AssignmentData; index: number }) {
                 <p className="text-xs text-slate-400 italic">Belum ada KR yang di-assign.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm border-collapse">
+                  <table className="w-full min-w-[580px] text-sm border-collapse">
                     <thead>
                       <tr className="border-b border-slate-100">
                         <th className="text-left py-2 pr-3 text-xs font-semibold text-slate-400">Key Result</th>

@@ -251,7 +251,7 @@ function ObjectiveSection({ obj, index }: { obj: ObjData; index: number }) {
         <div>
           <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">🔑 Key Results</p>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
+            <table className="w-full min-w-[580px] text-sm border-collapse">
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="text-left py-2 pr-3 text-xs font-semibold text-slate-400">Key Result</th>
@@ -310,7 +310,7 @@ function ObjectiveSection({ obj, index }: { obj: ObjData; index: number }) {
 
             {showContrib && (
               <div className="mt-3 overflow-x-auto">
-                <table className="w-full text-sm border-collapse">
+                <table className="w-full min-w-[580px] text-sm border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100">
                       <th className="text-left py-2 pr-3 text-xs font-semibold text-slate-400">Anggota</th>

@@ -55,7 +55,8 @@ function ObjCard({ obj, index }: { obj: ObjItem; index: number }) {
             {obj.krs.length === 0 ? (
               <p className="text-xs text-slate-400 text-center py-4">Belum ada KR yang di-assign ke kamu.</p>
             ) : (
-              <table className="w-full text-sm border-collapse">
+              <div className="overflow-x-auto">
+              <table className="w-full min-w-[580px] text-sm border-collapse">
                 <thead>
                   <tr className="border-b border-slate-100">
                     <th className="text-left py-2 pr-3 text-xs font-semibold text-slate-400">Key Result</th>
@@ -83,6 +84,7 @@ function ObjCard({ obj, index }: { obj: ObjItem; index: number }) {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </>

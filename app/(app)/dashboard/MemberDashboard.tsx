@@ -75,7 +75,8 @@ function ObjectiveCard({ obj, oa, index }: { obj: Objective; oa: number; index: 
           </div>
           <div className="p-5">
             <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">🔑 Key Results</p>
-            <table className="w-full text-sm border-collapse">
+            <div className="overflow-x-auto">
+            <table className="w-full min-w-[580px] text-sm border-collapse">
               <thead>
                 <tr className="border-b border-slate-100">
                   <th className="text-left py-2 pr-3 text-xs font-semibold text-slate-400">Key Result</th>
@@ -110,6 +111,7 @@ function ObjectiveCard({ obj, oa, index }: { obj: Objective; oa: number; index: 
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </>
       )}
