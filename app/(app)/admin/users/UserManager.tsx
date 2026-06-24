@@ -165,9 +165,38 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
   const [googleLinkingId, setGoogleLinkingId] = useState<string | null>(null);
   const [googleEmailInput, setGoogleEmailInput] = useState("");
   const [googleSaving, setGoogleSaving] = useState(false);
+  const [autoLinking, setAutoLinking] = useState(false);
+  const [autoLinkResult, setAutoLinkResult] = useState<{ linked: number; skipped: number; noMatch: number; log: string[] } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   function cancel() { setShowForm(false); setEditId(null); setForm(emptyForm); }
+
+  async function autoLinkMembers() {
+    const ok = await confirm({
+      title: "Auto-link semua member?",
+      message: "Sistem akan otomatis mencocokkan nama user MEMBER dengan anggota tim di divisi yang sama. User yang sudah ter-link tidak akan diubah.",
+    });
+    if (!ok) return;
+    setAutoLinking(true);
+    setAutoLinkResult(null);
+    try {
+      const res = await fetch("/api/users/auto-link-members", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error ?? "Gagal auto-link."); return; }
+      setAutoLinkResult(data);
+      if (data.linked > 0) {
+        const reloadedTms = await fetch("/api/admin/team-members").then((r) => r.json()).catch(() => null);
+        if (Array.isArray(reloadedTms)) setTms(reloadedTms);
+        toast.success(`${data.linked} member berhasil di-link otomatis`);
+      } else {
+        toast.warning(`Tidak ada link baru. ${data.skipped} sudah ter-link, ${data.noMatch} tidak cocok.`);
+      }
+    } catch {
+      toast.error("Terjadi kesalahan jaringan.");
+    } finally {
+      setAutoLinking(false);
+    }
+  }
 
   async function approveUser(id: string) {
     setApprovingId(id);
@@ -350,6 +379,13 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
             {importing ? "⏳ Mengimpor..." : "📤 Bulk Import Excel"}
             <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} disabled={importing} />
           </label>
+          <button
+            onClick={autoLinkMembers}
+            disabled={autoLinking}
+            className={`${btnSecondary} ${autoLinking ? "opacity-50 pointer-events-none" : ""}`}
+          >
+            {autoLinking ? "⏳ Mencocokkan..." : "🔗 Auto-Link Member"}
+          </button>
         </div>
         <p className="text-xs text-slate-400">Download template → isi → upload untuk buat akun massal</p>
       </div>
@@ -362,6 +398,25 @@ export default function UserManager({ initialUsers, teamMembers, divisions }: { 
             <details className="mt-2">
               <summary className="text-xs font-semibold cursor-pointer opacity-70">🔗 Detail auto-link ({importResult.linkLog.length})</summary>
               {importResult.linkLog.map((l, i) => <p key={i} className="text-xs mt-0.5 font-mono">{l}</p>)}
+            </details>
+          )}
+        </div>
+      )}
+
+      {autoLinkResult && (
+        <div className="rounded-xl px-4 py-3 text-sm mb-4 bg-blue-50 border border-blue-200 text-blue-700">
+          <div className="flex items-start justify-between gap-2">
+            <p className="font-semibold">
+              🔗 Auto-link selesai: {autoLinkResult.linked} di-link, {autoLinkResult.skipped} dilewati, {autoLinkResult.noMatch} tidak cocok
+            </p>
+            <button onClick={() => setAutoLinkResult(null)} className="text-blue-400 hover:text-blue-700 flex-shrink-0">✕</button>
+          </div>
+          {autoLinkResult.log.length > 0 && (
+            <details className="mt-2">
+              <summary className="text-xs font-semibold cursor-pointer opacity-70">Detail ({autoLinkResult.log.length})</summary>
+              <div className="mt-1 space-y-0.5">
+                {autoLinkResult.log.map((l, i) => <p key={i} className="text-xs font-mono">{l}</p>)}
+              </div>
             </details>
           )}
         </div>
